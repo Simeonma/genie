@@ -60,13 +60,32 @@ _sys.modules[__name__ + ".material"] = material
 __version__ = "2.0.0a5"
 
 
+def _swap_connect(fn):
+    """临时把 ``genie.connect`` 换成 ``fn``，返回 restore 回调。
+
+    只给 ``core.preview`` 用：预览要在**零网络**下执行用户脚本，而脚本会
+    ``import genie`` 调 ``genie.connect``。交换动作属于公开面，所以由这里
+    实现、经 hooks 注入——core 不反向 import 本模块（分层契约）。
+    """
+    global connect
+    original = connect
+    connect = fn
+
+    def _restore() -> None:
+        global connect
+        connect = original
+
+    return _restore
+
+
 # ── 组合根（G1 分层契约，2026-10-11 定案）───────────────────────────
 # core 只依赖 models；expert / 提交镜像 publish / 材质库 HTTP 回退的实现在
 # 上层（net / integrations），在此
 # 一次性注入 core 的 hooks——``import genie`` 即接线，core 永不反向
 # import 上层。分层守卫 = tests/sdk/test_layering.py。
 def _wire_core_hooks() -> None:
-    from .core import material as _material, simulate as _simulate
+    from .core import material as _material, preview as _preview
+    from .core import simulate as _simulate
     from .integrations.live import publish as _publish
     from .net import client as _client
     from .net.expert import ExpertSession
@@ -76,6 +95,7 @@ def _wire_core_hooks() -> None:
         publish=_publish,
     )
     _material._wire(remote_nk_fetch=_client.fetch_nk_payload)
+    _preview._wire(_swap_connect)
 
 
 _wire_core_hooks()

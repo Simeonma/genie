@@ -29,8 +29,8 @@ from typing import Any, Callable
 
 from .errors import GenieHTTPError, GenieJobError
 
-from genie.models import SweepSpec
-from genie.models.sweep_expand import validate_sweep_config
+from ..models import SweepSpec
+from ..models.sweep_expand import validate_sweep_config
 
 # 父终态口径（与旧服务端父状态机同名，下游消费零迁移）
 SWEEP_TERMINAL_OK = "done"

@@ -33,8 +33,8 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 # owner / session_id 白名单 = 全仓唯一一份（genie.studio.session_client）
-from genie.studio.kernel_session import workspace_root
-from genie.studio.session_client import DEFAULT_SESSION, check_owner, check_session_id
+from .kernel_session import workspace_root
+from .session_client import DEFAULT_SESSION, check_owner, check_session_id
 
 _kernels: dict[tuple[str, str], object] = {}   # (owner, session_id) → SessionKernel
 _lock = threading.Lock()

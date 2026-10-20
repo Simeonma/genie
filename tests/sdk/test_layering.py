@@ -42,8 +42,12 @@ _SERVICE_LAYERS = frozenset({"cloud", "host", "services"})
 
 
 def _iter_modules():
+    """扫描范围 = 库代码。`examples/` 是随包分发的用户脚本，本来就该用
+    公开 API（`import genie`），不是分层契约的当事人。"""
     for p in sorted(SDK.rglob("*.py")):
         if "__pycache__" in p.parts:
+            continue
+        if "examples" in p.relative_to(SDK).parts:
             continue
         yield p
 
@@ -59,7 +63,12 @@ def _layer_of(dotted: str) -> str | None:
 
 def _imports_of(path: Path, pkg_chain: list[str]) -> set[str]:
     """文件全量 import 的顶层目标点名（genie 内部模块记 genie.<层>…，
-    外部包记原名；相对 import 按 pkg_chain 解析）。"""
+    外部包记原名；相对 import 按 pkg_chain 解析）。
+
+    包 ``__init__.py`` 的 pkg_chain 已经去掉了文件名，所以 ``level=1``
+    指向"自身这个包"，少减一层；普通模块则按 `chain[:-level]`。
+    """
+    is_pkg = path.name == "__init__.py"
     tree = ast.parse(path.read_text(encoding="utf-8"))
     out: set[str] = set()
     for node in ast.walk(tree):
@@ -74,9 +83,16 @@ def _imports_of(path: Path, pkg_chain: list[str]) -> set[str]:
                             else root)
                 # `from x import y` 无 module（level 0 不存在此形态）
             else:
-                base = pkg_chain[: len(pkg_chain) - node.level]
-                target = ".".join(base + [m for m in (node.module or "").split(".") if m])
-                out.add(target)
+                cut = node.level - 1 if is_pkg else node.level
+                base = pkg_chain[: len(pkg_chain) - cut]
+                mod_parts = [m for m in (node.module or "").split(".") if m]
+                if mod_parts:
+                    out.add(".".join(base + mod_parts))
+                else:
+                    # `from . import a, b`：真目标是 base.a / base.b，
+                    # 不是 base 本身（旧写法把它当成"导入父包"，会误报）。
+                    for a in node.names:
+                        out.add(".".join(base + [a.name]))
     return out
 
 
@@ -103,6 +119,16 @@ def test_layering_contract(path: Path):
                 f"在 genie-service 仓；两边只经 HTTP 说话）")
         if not target.startswith("genie"):
             continue                            # 外部依赖不在分层契约内
+        # 组合根 `genie`（包 __init__）不是"无层"，是**最上层**：只有 studio
+        # 这个组合层可以直接用它；其余层要用上层能力一律走 hooks 注入
+        # （2026-10-21：core/preview 曾 `import genie` 换 connect，被旧判据
+        # 的 `layer is None → continue` 静默放过）。
+        if target == "genie":
+            if own is not None and own != "studio":
+                pytest.fail(
+                    f"{mod}: 分层契约违规——{own} 层不得 import 组合根 `genie`"
+                    f"（能力走组合根 hooks 注入，见 genie/__init__._wire_core_hooks）")
+            continue
         layer = _layer_of(target)
         if layer is None or layer == own:
             continue                            # 组合根 / 同层
@@ -112,6 +138,28 @@ def test_layering_contract(path: Path):
                 f"{mod}: 分层契约违规——{_ALLOWED and own} 层不得依赖 "
                 f"{layer} 层（{own} 允许: {sorted(allowed) or '仅外部依赖'}；"
                 f"交互/传输能力走组合根 hooks，见 genie/__init__）")
+
+
+def test_low_layers_use_relative_imports():
+    """下层（models / core）**不得用绝对 `genie.*` 导入**。
+
+    绝对导入会先导入根包 `genie/__init__`，而那个文件要 import 本层——
+    等于把"下层可独立使用"这个性质悄悄废掉（也是隐性循环依赖的来源）。
+    上层（studio / `__main__`）本来就是入口，允许绝对导入。
+    """
+    offenders = []
+    for p in _iter_modules():
+        rel = p.relative_to(SDK)
+        if rel.parts[0] not in ("models", "core"):
+            continue
+        tree = ast.parse(p.read_text(encoding="utf-8"))
+        for n in ast.walk(tree):
+            if isinstance(n, ast.ImportFrom) and not n.level \
+                    and (n.module or "").startswith("genie."):
+                offenders.append(f"{rel}:{n.lineno} from {n.module}")
+    assert not offenders, (
+        "下层出现绝对 genie 导入（改用相对 `from ..x import y`）：\n"
+        + "\n".join(offenders))
 
 
 def test_composition_root_wires_core():

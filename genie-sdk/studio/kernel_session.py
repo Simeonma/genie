@@ -33,7 +33,7 @@ import threading
 import time
 from pathlib import Path
 
-from genie.studio.session_client import DEFAULT_SESSION
+from .session_client import DEFAULT_SESSION
 
 _WORKER = Path(__file__).with_name("kernel_worker.py").resolve()
 MAX_LINES = 4000          # 输出环上限（超出丢最旧——terminal 滚动语义）

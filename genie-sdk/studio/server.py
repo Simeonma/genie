@@ -39,8 +39,8 @@ import genie
 # 工作区根**唯一解析点**（M2）：此前 studio 侧另有一份 GENIE_SCRIPTS_DIR
 # 解析，只设 GENIE_SESSION_CWD 时两处得出不同根目录——"文件面板看不到
 # 脚本/结果"的根源。现在双方都调 kernel_session.workspace_root()。
-from genie.studio.kernel_session import workspace_root
-from genie.studio.session_client import (SessionClient, register_result_routes,
+from .kernel_session import workspace_root
+from .session_client import (SessionClient, register_result_routes,
                                          register_session_routes)
 
 _STUDIO = Path(__file__).resolve().parent / "static"

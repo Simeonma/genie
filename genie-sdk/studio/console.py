@@ -25,7 +25,7 @@ import signal
 import sys
 import time
 
-from genie.studio.session_client import SessionClient
+from .session_client import SessionClient
 
 
 def _poll_output(cli: SessionClient, cursor: int, *, owner: str,

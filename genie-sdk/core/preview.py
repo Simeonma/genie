@@ -47,6 +47,21 @@ from .simulate import Simulation
 __all__ = ["preview_script"]
 
 
+# ── 组合根钩子（G1 分层契约）──────────────────────────────────────────────
+# 本模块要执行**用户脚本**，而用户脚本会 ``import genie`` 调 ``genie.connect``
+# ——那是公开面（上层）。core 不能反向 import 它（`test_layering.py` 的
+# 分层契约），所以照 simulate/material 的老规矩：**组合根注入能力**。
+# 公开面的 ``genie/__init__.py::_swap_connect`` 在 import 时注册进来，
+# 负责临时把 ``genie.connect`` 换成零网络工厂并返回 restore 回调。
+_swap_connect = None
+
+
+def _wire(connect_swap) -> None:
+    """组合根接线：注入"临时替换 connect"的能力（只由 ``genie/__init__`` 调）。"""
+    global _swap_connect
+    _swap_connect = connect_swap
+
+
 class _Inert:
     """宽容占位对象：预览模式下 get_*/sweep 句柄的返回值。
 
@@ -193,7 +208,9 @@ def preview_script(source: str, *, label: str = "<genie脚本>") -> dict:
     为已捕获部分）、``stdout``（print 输出）、``error``（None 或
     ``{kind, message, line, traceback}``，line = 脚本帧行号）。
     """
-    import genie as _g   # 延迟：避免包导入环
+    if _swap_connect is None:
+        raise RuntimeError(
+            "preview 未接线：需要组合根先 import genie（见 core/preview._wire）")
 
     out: dict[str, Any] = {"ok": False, "cfg": {}, "stdout": "", "error": None}
 
@@ -216,8 +233,7 @@ def preview_script(source: str, *, label: str = "<genie脚本>") -> dict:
         return sim
 
     buf = io.StringIO()
-    real_connect = _g.connect
-    _g.connect = _fake_connect
+    restore = _swap_connect(_fake_connect)      # 组合根负责换/还原公开面
     try:
         with redirect_stdout(buf):
             # __file__ 给标签名：脚本引导块（sys.path/Path(__file__) 类）
@@ -235,7 +251,7 @@ def preview_script(source: str, *, label: str = "<genie脚本>") -> dict:
         out["error"] = {"kind": type(e).__name__, "message": str(e),
                         "line": line, "traceback": tb_text}
     finally:
-        _g.connect = real_connect
+        restore()
 
     out["stdout"] = buf.getvalue()
     if sims:
@@ -244,8 +260,8 @@ def preview_script(source: str, *, label: str = "<genie脚本>") -> dict:
         # 守卫同一把尺子（genie.models.estimate 单一真源）。preview 对
         # 半成品宽容：domain/mesh 缺字段就静默省略此节。
         try:
-            from genie.models._wire import DomainSpec, MeshSpec
-            from genie.models.estimate import mesh_preview_stats
+            from ..models._wire import DomainSpec, MeshSpec
+            from ..models.estimate import mesh_preview_stats
             cfg = out["cfg"]
             if cfg.get("domain") and cfg.get("mesh"):
                 out["estimate"] = mesh_preview_stats(

@@ -14,8 +14,8 @@
 """
 from __future__ import annotations
 
-from genie.studio import session_service as _svc
-from genie.studio.session_client import DEFAULT_SESSION
+from . import session_service as _svc
+from .session_client import DEFAULT_SESSION
 
 
 class LocalSessionHost:
