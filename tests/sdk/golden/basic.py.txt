@@ -1,0 +1,57 @@
+# ── GENIE Cloud SDK 脚本 · 由 GENIE Studio 表单自动生成 ──
+# 本地运行: pip install genie  # from <YOUR_GENIE_RELEASE_CHANNEL>
+import genie
+
+f = genie.connect('https://genie.example.com', api_key="YOUR_API_KEY", username="YOUR_USERNAME")
+
+# ── Domain 域 ──
+f.domain.x_range = (-1e-6, 1e-6)
+f.domain.y_range = (-1e-6, 1e-6)
+f.domain.z_range = (-2e-6, 2e-6)
+f.domain.total_time = 6e-14
+f.domain.boundary_condition('z_min', 'pml')
+f.domain.boundary_condition('z_max', 'pml')
+
+# ── Mesh 网格 ──
+f.mesh.dx = 2e-8
+f.mesh.dy = 3e-8
+f.mesh.dz = 2e-8
+
+# ── Materials 材料 ──
+f.mat.add_const() \
+    .name('sio2') \
+    .eps(2.1) \
+    .mu(1.2)
+
+# ── Geometry 结构 ──
+f.geom.add_box().material('sio2') \
+    .x_range(-5e-7, 5e-7) \
+    .y_range(-5e-7, 5e-7) \
+    .z_range(-1e-7, 1e-7) \
+    .priority(2)
+
+# ── Source 源 ──
+f.src.add_soft_source() \
+    .freq(3e14) \
+    .bandwidth(6e13) \
+    .delay(1e-15) \
+    .phase(0.5) \
+    .name('s0') \
+    .center(0, 0, -3e-7) \
+    .polarization(complex(1, 2), complex(0, 0), complex(0, 0)) \
+    .amplitude(2) \
+    .kind('magnetic')
+
+# ── Monitor 监视器 ──
+f.mon.add_time() \
+    .name('pt') \
+    .center(0, 0, 2e-7) \
+    .field('Ex') \
+    .down_sample((0, 1e-13), 2)
+
+# ── Run 运行 ──
+f.run(timeout_s=600)
+
+# ── 结果（纯数据 numpy） ──
+t_pt = f.get_time('pt')        # t_pt.time / t_pt.fields['Ey']
+print(t_pt.time[-1])        # 末时刻 (s)

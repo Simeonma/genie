@@ -1,0 +1,106 @@
+# ── GENIE Cloud SDK 脚本 · 由 GENIE Studio 表单自动生成 ──
+# 本地运行: pip install genie  # from <YOUR_GENIE_RELEASE_CHANNEL>
+import genie
+
+f = genie.connect('https://genie.example.com', api_key="YOUR_API_KEY", username="YOUR_USERNAME")
+
+# ── Domain 域 ──
+f.domain.x_range = (-2e-6, 2e-6)
+f.domain.y_range = (-1e-6, 1e-6)
+f.domain.z_range = (-1e-6, 1e-6)
+f.domain.total_time = 6e-14
+f.domain.cfl = 0.95
+f.domain.boundary_condition('x_min', 'bloch', k=(1000000, 0, 0), n_background=1.5)
+f.domain.boundary_condition('x_max', 'periodic')
+f.domain.boundary_condition('z_min', 'pml', layers=8, kappa_max=1.5, order=4)
+f.domain.boundary_condition('z_max', 'pml')
+
+# ── Mesh 网格 ──
+f.mesh.dx = 2e-8
+f.mesh.dy = 3e-8
+f.mesh.dz = 4e-8
+f.mesh.max_refinement = 64
+f.mesh.min_cells = 12
+f.mesh.refine((0, 1e-7), (0, 1e-7), (0, 1e-7), factor=[2, 3, 4], growth_rate=1.3)
+f.mesh.refine((-1e-7, 0), (-1e-7, 0), (-1e-7, 0), factor=3)
+
+# ── Materials 材料 ──
+f.mat.add_const() \
+    .name('sio2') \
+    .eps(2.1) \
+    .mu([1, 1.1, 1.2])
+f.mat.add_lorentz() \
+    .name('au') \
+    .eps_inf(1.5) \
+    .add_eps_drude_pole(1e15, 1e13, alpha=[1, 0, 0], beta=[0, 1, 0]) \
+    .add_eps_lorentz_pole(2e15, 2e13, 3) \
+    .add_mu_lorentz_pole(3e15, 3e13)
+
+# ── Geometry 结构 ──
+f.geom.add_sphere().material('au') \
+    .center(1e-7, 0, 0) \
+    .radius(5e-8) \
+    .priority(1)
+f.geom.add_cylinder().material('sio2') \
+    .radius(3e-8) \
+    .height(1e-7)
+f.geom.add_ngon_z().material('sio2') \
+    .n_sides(6) \
+    .circumradius(4e-8) \
+    .height(1e-7)
+f.geom.add_polygon_z().material('sio2') \
+    .vertices([(0, 0), (1e-7, 0), (1e-7, 1e-7), (float('nan'), float('nan')), (0, 1e-7)]) \
+    .z_range(0, 1e-7)
+f.geom.add_ellipse_z().material('sio2') \
+    .rx(2e-8) \
+    .ry(3e-8) \
+    .height(1e-7)
+f.geom.add_ring_z().material('sio2') \
+    .inner_radius(1e-8) \
+    .outer_radius(4e-8) \
+    .height(1e-7)
+f.geom.add_polygon_swept().material('sio2') \
+    .vertices([(0, 0), (1e-7, 0), (1e-7, 1e-7)]) \
+    .z_range(0, 1e-7) \
+    .tilt(0.1, 0.2)
+
+# ── Source 源 ──
+f.src.add_plane_wave() \
+    .freq(3e14) \
+    .bandwidth(6e13) \
+    .name('pw') \
+    .direction('-') \
+    .amplitude(2) \
+    .center(0, 0, -5e-7) \
+    .theta(30) \
+    .phi(45) \
+    .psi(15) \
+    .size(1e-6, 1e-6, None) \
+    .propagation_axis('z') \
+    .from_face('z_min')
+f.src.add_gaussian_beam() \
+    .freq(3e14) \
+    .bandwidth(6e13) \
+    .name('gb') \
+    .center(0, 0, -5e-7) \
+    .radius(2e-6)
+
+# ── Monitor 监视器 ──
+f.mon.add_freq() \
+    .name('sp') \
+    .center(0, 0, 2e-7) \
+    .size(1e-6, 1e-6, 0) \
+    .field('all') \
+    .freq(3e14, 1.2e14, 200) \
+    .apodize('both', (0, 1e-13), 5e-15)
+f.mon.add_index() \
+    .name('ix') \
+    .field('eps')
+
+# ── Run 运行 ──
+f.run(gpu=2, timeout_s=600)
+
+# ── 结果（纯数据 numpy） ──
+fr_sp = f.get_freq('sp')       # fr_sp.freqs / fr_sp.fields
+print(fr_sp.freqs.min(), fr_sp.freqs.max())   # 频轴范围 (Hz)
+ix_ix = f.get_index('ix')

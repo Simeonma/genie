@@ -1,0 +1,34 @@
+# ── GENIE Cloud SDK 脚本 · 由 GENIE Studio 表单自动生成 ──
+# 本地运行: pip install genie  # from <YOUR_GENIE_RELEASE_CHANNEL>
+import genie
+
+f = genie.connect('https://genie.example.com', api_key="YOUR_API_KEY", username="YOUR_USERNAME")
+
+# ── Domain 域 ──
+f.domain.x_range = (-1e-6, 1e-6)
+f.domain.y_range = (-1e-6, 1e-6)
+f.domain.z_range = (-1e-6, 1e-6)
+f.domain.total_time = 6e-14
+
+# ── Mesh 网格 ──
+f.mesh.dx = 2e-8
+
+# ── Materials 材料 ──
+# 材料拟合（客户端 genie.material.fit_nk）
+_nk = genie.material.load_library_nk('Au')
+_fit = genie.material.fit_nk(_nk, fit_range=(3e-7, 9e-7), n_drude=1, n_lorentz=3, maxfev=8000)
+_mat = f.mat.add_lorentz().name('au').eps_inf(_fit['eps_inf'])
+for _p in _fit['poles']:
+    if _p['kind'] == 'drude':
+        _mat.add_eps_drude_pole(_p['omega_p'], _p['gamma'])
+    else:
+        _mat.add_eps_lorentz_pole(_p['omega_0'], _p['gamma'], _p['delta_eps'])
+
+# ── Source 源 ──
+f.src.add_soft_source() \
+    .freq(3e14) \
+    .bandwidth(6e13) \
+    .name('s0')
+
+# ── Run 运行 ──
+f.run()

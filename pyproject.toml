@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "genie"
+version = "2.0.0a4"
+description = "GENIE SDK v2 — 脚本构建仿真、f.run() 提交云端 GPU；preview_script 零网络预览（模型与提交互不相干）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "requests>=2.28",
+    "numpy>=1.24",
+    # 线格式模型（genie.models = 唯一真源；_cfg 即 SimConfig 实例——
+    # pydantic 是 import genie 的硬运行依赖）
+    "pydantic>=2,<3",
+    # 结果读取（genie-results-h5/1：f.results(job_id) 的 SimData 结构体）
+    "h5py>=3.0",
+]
+
+[project.optional-dependencies]
+# 本地 Studio 服务（genie.studio.server：静态 + /api/preview——
+# framework §四「Pyodide 删掉」后的端点，与阶段 6 云宿主同一个函数）
+server = ["fastapi>=0.104", "uvicorn>=0.24", "python-multipart>=0.0.32"]
+#                  ^ python-multipart：/api/workspace/upload 的 multipart 必需（B3/B4）
+# MCP 工具面（genie-mcp 命令）：让任意 LLM agent 写脚本推 GUI
+agent = ["mcp>=2.0,<3"]
+# 材料拟合（fit_nk/add_from_library 需要 scipy.curve_fit）
+fit = ["scipy>=1.10"]
+# 结果画图（SimData.plot —— matplotlib 按需，不进核心依赖）
+plot = ["matplotlib>=3.7"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+genie = "genie.__main__:main"
+genie-mcp = "genie.integrations.mcp:main"
+
+# 打包白名单（framework §四 目录树的全部子包；显式列表防误收）
+# package-dir：源码目录叫 genie-sdk（与仓名一致），包名仍是 genie（import genie）。
+# 目录名带连字符不能作包名，靠这条映射把 genie.* 解析到 genie-sdk/*；
+# wheel 内路径依然是 genie/，所以 install 地址与发布门断言都不用动。
+[tool.setuptools]
+packages = ["genie", "genie.models", "genie.core", "genie.core.nkdata",
+            "genie.core.script", "genie.lib", "genie.net",
+            "genie.integrations", "genie.studio"]
+package-dir = { genie = "genie-sdk" }
+
+# 随包数据：n-k 材料库 yml + 内容面（手册 / 示例）+ Studio 前端壳。
+# 2026-10-18 修复：原规则全是**单层 glob**（static/*），漏掉
+# static/modules/ 与 static/views/ ⇒ 发出的 wheel 里 Studio 前端模块
+# 全缺，GUI 起来但白屏、19 个 404。新增静态子目录必须在此登记；
+# publish.sh 会读 index.html 的引用逐条校验产物作为发布门。
+# 2026-10-21 拆分：手册（manual/）与示例（examples/）移出 studio/static，
+# 它们是随包分发的内容、不是 GUI 实现；URL 仍是 /manual/…、/examples/…
+# （server 各挂一个 mount），所以 index.html 与手册内部链接一行未改。
+# 内部设计文档（原 static/manual/proposals/）不随包分发——用户手册面与
+# 内部提案面分离；提案档已于 2026-10-18 删除。
+[tool.setuptools.package-data]
+genie = [
+    "docs/*.md",
+    "manual/commands/*", "manual/commands/figs/*",
+    "examples/*",
+]
+"genie.core.nkdata" = ["*.yml"]
+"genie.studio" = [
+    "static/*", "static/vendor/*",
+    "static/modules/*", "static/views/*",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

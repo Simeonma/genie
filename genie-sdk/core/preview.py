@@ -1,0 +1,256 @@
+"""脚本 → 模型：执行捕获引擎（genie-service Studio 的心脏）。
+
+定位
+----
+v2 定案「脚本是本体」：GUI 不再有 cfg 中心，显示所需的模型 = **在本地
+把脚本执行一遍、捕获其构建结果**。本模块就是这扇门::
+
+    import genie
+    r = genie.preview_script(source)
+    # {"ok": bool, "cfg": SimConfig dict, "stdout": str,
+    #  "error": None | {"kind", "message", "line", "traceback"}}
+
+机制（trace，不做静态翻译）
+--------------------------
+临时把 ``genie.connect`` 换成零网络工厂（``_PreviewSim``），``exec``
+脚本文本；builder 链式调用天然逐条落进 ``_cfg``（``_Chain`` 本就是
+记录器）。由此：
+
+  · ``for`` 循环 = 执行 N 次 = cfg 里 N 个节点（天然"编译展开"）；
+  · numpy/任意 Python 表达式 = 编译期求值成字面量；
+  · 脚本里的普通 ``def``（含 ``asm_<名>`` 命名的组装体函数——就是普通
+    Python 函数）照常定义与调用，产出的节点平铺进各列表（2026-10
+    阶段 2：asm 归属归因/纯化/写回已按 framework §十 作废删除，
+    不再有块级视图与只读保护）；
+  · ``f.run()`` 只录制 ``run`` 节（gpu/timeout_s），**不提交**；
+  · ``f.get_*()/f.sweep()/summary/digest`` 返回宽容占位（``_Inert``）
+    ——后处理脚本不崩，但拿不到真数据（预览不做作业）；
+  · ``print`` 输出被捕获随结果返回（GUI 诊断窗）。
+
+失败语义 = 带行号的诊断（不静默）：语法错/运行时异常 → ``ok=False`` +
+错误定位（脚本帧行号）+ traceback 尾部；已捕获的部分 cfg 照样返回
+（改到哪行一目了然）。``genie.connect`` 无论成败都在 ``finally`` 里
+恢复原函数。
+
+纪律：零网络（connect 被换掉后无任何 requests 路径可达）、零 fdtd
+import（同 ``_script.py``，无内核机可用）。
+"""
+from __future__ import annotations
+
+import io
+import traceback
+from contextlib import redirect_stdout
+from typing import Any
+
+from .simulate import Simulation
+
+__all__ = ["preview_script"]
+
+
+class _Inert:
+    """宽容占位对象：预览模式下 get_*/sweep 句柄的返回值。
+
+    只求"脚本不因取结果而崩"（显示用），不求语义——属性/下标/调用/
+    迭代全接管，str/repr 明示占位身份。"""
+
+    __slots__ = ()
+
+    def __getattr__(self, name: str) -> "_Inert":
+        return _Inert()
+
+    def __getitem__(self, key: Any) -> "_Inert":
+        return _Inert()
+
+    def __call__(self, *a: Any, **k: Any) -> "_Inert":
+        return _Inert()
+
+    def __iter__(self):
+        return iter(())
+
+    def __len__(self) -> int:
+        return 0
+
+    def __bool__(self) -> bool:
+        return False
+
+    def __repr__(self) -> str:
+        return "<preview 占位：预览模式不执行作业>"
+
+    def __str__(self) -> str:
+        return "<preview 占位>"
+
+    def __format__(self, spec: str) -> str:
+        return format(str(self), spec)
+
+
+class _PreviewSim(Simulation):
+    """零网络 Simulation：run/sweep/get_* 录制不执行。
+
+    继承全部 builder 面（domain/mesh/mat/geom/src/mon 与 to_config/
+    load_config/to_script 原样可用）；只覆写会碰网络的生命周期方法。
+    """
+
+    def __init__(self) -> None:
+        super().__init__(client=None)
+
+    # ---- 生命周期（录制，不提交）----
+
+    def _submit(self) -> "_PreviewSim":
+        if getattr(self._cfg.domain, "total_time", None) is None:
+            raise RuntimeError(
+                "domain.total_time 缺失（唯一时间定义，SI 秒 >0）——"
+                "先 f.domain.total_time = 6e-14 再提交")
+        self._job_id = "preview"          # 占位 id：防同实例二次提交语义漂移
+        self.state = "built"
+        return self
+
+    def run(self, *, gpu: int | None = None,
+            timeout_s: int | None = None, poll_interval: float = 2.0,
+            progress=None) -> "_PreviewSim":
+        """录制 run 节后即视为完成（不提交、不轮询）。参数语义与真 run
+        完全一致（同款收集与防重复提交纪律）；与真 run 不同处：不过
+        提交边界预检——preview 对半成品宽容（缺必填是常态，GUI 只显示
+        已建造部分）。"""
+        if self._job_id is not None and any(v is not None for v in (gpu, timeout_s)):
+            raise RuntimeError(
+                "已提交的作业不能再改 gpu/timeout_s（配置已发出）——"
+                "新建 connect() 实例重配")
+        if gpu is not None:
+            self._cfg.run.gpu = int(gpu)
+        if timeout_s is not None:
+            self._cfg.run.timeout_s = int(timeout_s)
+        if self._job_id is None:
+            self._submit()
+        self.state = "done"
+        return self
+
+    def sweep(self, *a: Any, **k: Any) -> _Inert:
+        return _Inert()
+
+    def get_time(self, name: str | None = None) -> _Inert:
+        return _Inert()
+
+    def get_freq(self, name: str | None = None) -> _Inert:
+        return _Inert()
+
+    def get_index(self, name: str | None = None) -> _Inert:
+        return _Inert()
+
+    def summary(self) -> dict:
+        return {"preview": True}
+
+    def digest(self, job_id: str | None = None) -> dict:
+        return {"preview": True}
+
+
+def merge_configs(cfgs: list[dict]) -> dict:
+    """多 connect 实例的捕获合并：节 dict 后者覆盖、列表按声明序拼接、
+    run 取最后实际 run 的、parameters 逐名后者覆盖
+    （"每个作业用新 connect 实例"的脚本语义）。
+
+    判据注意（阶段 ④）：输入是 model_dump(mode="json") 的 dense dict——
+    ``run``/``parameters`` 键恒在场（run 带 gpu/timeout_s 默认、
+    parameters 为 None），合并规则相应取「run 末位覆盖、parameters 逐名后者覆盖、全缺省补 None」——保证单 sim 场景
+    与 to_config() 逐键同形（smoke 往返锚）。"""
+    merged: dict[str, Any] = {
+        "domain": {}, "mesh": {}, "materials": [], "geometry": [],
+        "source": [], "monitor": [], "run": {},
+    }
+    for c in cfgs:
+        for k in ("domain", "mesh"):
+            merged[k].update(c.get(k) or {})
+        for k in ("materials", "geometry", "source", "monitor"):
+            merged[k].extend(c.get(k) or [])
+        if c.get("run"):
+            merged["run"] = c["run"]
+        if c.get("parameters"):
+            merged.setdefault("parameters", {}).update(c["parameters"])
+    if "parameters" not in merged:
+        merged["parameters"] = None
+    return merged
+
+
+def nan_to_none(v: Any) -> Any:
+    """JSON 安全化：float('nan') → None。
+
+    polygon 哨兵的 Python 侧形态是 (nan, nan)，而**线格式是 [null, null]**
+    （JSON 严格语法无 NaN 字面量）。preview 的 cfg 会直接序列化为 JSON
+    （GUI/端点），出口处归一回线格式正形——顺带消灭 pyworker 时代
+    json.dumps 产出裸 NaN 非法 JSON 的潜在坑（2026-10 阶段 ②）。"""
+    if isinstance(v, float):
+        return None if v != v else v
+    if isinstance(v, dict):
+        return {k: nan_to_none(x) for k, x in v.items()}
+    if isinstance(v, list):
+        return [nan_to_none(x) for x in v]
+    return v
+
+
+def preview_script(source: str, *, label: str = "<genie脚本>") -> dict:
+    """执行 genie 脚本（零网络捕获）→ 显示模型。
+
+    返回 dict：``ok``（执行到底与否）、``cfg``（SimConfig JSON，异常时
+    为已捕获部分）、``stdout``（print 输出）、``error``（None 或
+    ``{kind, message, line, traceback}``，line = 脚本帧行号）。
+    """
+    import genie as _g   # 延迟：避免包导入环
+
+    out: dict[str, Any] = {"ok": False, "cfg": {}, "stdout": "", "error": None}
+
+    # ① 语法先行（compile 给出带行号的 SyntaxError）
+    try:
+        code = compile(source, label, "exec")
+    except SyntaxError as e:
+        out["error"] = {"kind": "syntax", "message": str(e.msg or e),
+                        "line": e.lineno or 0, "traceback": ""}
+        return out
+
+    # ② exec：connect 换零网络工厂 + stdout 捕获；finally 恢复
+    sims: list[_PreviewSim] = []
+
+    def _fake_connect(base_url: str | None = None, api_key: str | None = None,
+                      username: str | None = None, *, timeout: float = 30.0
+                      ) -> "_PreviewSim":
+        sim = _PreviewSim()
+        sims.append(sim)
+        return sim
+
+    buf = io.StringIO()
+    real_connect = _g.connect
+    _g.connect = _fake_connect
+    try:
+        with redirect_stdout(buf):
+            # __file__ 给标签名：脚本引导块（sys.path/Path(__file__) 类）
+            # 在预览态不 NameError，路径退化为无害垃圾（2026-10 live 通道实测）
+            exec(code, {"__name__": "__main__", "__file__": label})
+        out["ok"] = True
+    except BaseException as e:  # noqa: BLE001 —— 诊断对象，不吞信息
+        tb_text = traceback.format_exc(limit=8)
+        line = 0
+        tb_e = e.__traceback__
+        while tb_e is not None:            # 由内向外找脚本帧行号
+            if tb_e.tb_frame.f_code.co_filename == label:
+                line = tb_e.tb_lineno
+            tb_e = tb_e.tb_next
+        out["error"] = {"kind": type(e).__name__, "message": str(e),
+                        "line": line, "traceback": tb_text}
+    finally:
+        _g.connect = real_connect
+
+    out["stdout"] = buf.getvalue()
+    if sims:
+        out["cfg"] = nan_to_none(merge_configs([s.to_config() for s in sims]))
+        # G19a（G3 方向 2）：设计态估算随行——格数/dt 估/步数估，与内核
+        # 守卫同一把尺子（genie.models.estimate 单一真源）。preview 对
+        # 半成品宽容：domain/mesh 缺字段就静默省略此节。
+        try:
+            from genie.models._wire import DomainSpec, MeshSpec
+            from genie.models.estimate import mesh_preview_stats
+            cfg = out["cfg"]
+            if cfg.get("domain") and cfg.get("mesh"):
+                out["estimate"] = mesh_preview_stats(
+                    DomainSpec.model_validate(cfg["domain"]),
+                    MeshSpec.model_validate(cfg["mesh"]))
+        except Exception:              # noqa: BLE001 —— 估算失败不伤 preview
+            pass
+    return out
