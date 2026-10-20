@@ -50,7 +50,7 @@ package-dir = { genie = "genie-sdk" }
 # 2026-10-18 修复：原规则全是**单层 glob**（static/*），漏掉
 # static/modules/ 与 static/views/ ⇒ 发出的 wheel 里 Studio 前端模块
 # 全缺，GUI 起来但白屏、19 个 404。新增静态子目录必须在此登记；
-# publish.sh 会读 index.html 的引用逐条校验产物作为发布门。
+# publish.py 会读 index.html 的引用逐条校验产物作为发布门。
 # 2026-10-21 拆分：手册（manual/）与示例（examples/）移出 studio/static，
 # 它们是随包分发的内容、不是 GUI 实现；URL 仍是 /manual/…、/examples/…
 # （server 各挂一个 mount），所以 index.html 与手册内部链接一行未改。
