@@ -253,6 +253,46 @@ def _wait_idle(k: SessionKernel, timeout_s: float = 15.0) -> bool:
     return False
 
 
+def _wait_apply(k: SessionKernel, cfg_seq0: int, timeout_s: float = 30.0) -> dict:
+    """等一次写入落地：返回 `busy=False` 且 `cfg_seq` 已前进的 output。
+
+    `_wait_idle` 不能单独用作落地判据：写是异步的，调用方可能在 worker
+    还没开始处理时就看到 `busy=False`，于是读到**旧** cfg（实测：patch
+    domain.cfl=0.5 后读到默认 0.9）。
+    """
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        out = k.output(0)
+        if not out["busy"] and out.get("cfg_seq", 0) > cfg_seq0:
+            return out
+        time.sleep(0.05)
+    out = k.output(0)
+    raise AssertionError(
+        "写入未落地：cfg_seq %r→%r busy=%r lines=%r"
+        % (cfg_seq0, out.get("cfg_seq"), out["busy"],
+           [l["text"][:50] for l in out["lines"]][-4:]))
+
+
+def _wait_cfg(k: SessionKernel, timeout_s: float = 30.0) -> dict:
+    """等一次写入**真的落地**，返回落地后的 cfg。
+
+    `_wait_idle` 单独用有竞态：`submit()` 刚返回时 worker 可能还没把
+    `busy` 置真，于是它立刻返回 True、读到的是旧 cfg（None）。判据要同时
+    满足"不在忙"和"cfg 非空"，否则就是在等一个还没开始的活。
+    """
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        out = k.output(0)
+        if not out["busy"] and out["cfg"]:
+            return out["cfg"]
+        time.sleep(0.1)
+    out = k.output(0)
+    raise AssertionError(
+        "等到 cfg 超时：busy=%r cfg=%r lines=%r"
+        % (out["busy"], bool(out["cfg"]),
+           [l["text"][:60] for l in out["lines"]][-5:]))
+
+
 def _wait_text(k: SessionKernel, needle: str, timeout_s: float = 15.0) -> str:
     """等某段文字出现在第 0 号会话的输出里，返回当时的全文。
 
@@ -735,10 +775,10 @@ def test_patch_applies_path_and_tags_origin(tmp_path):
              "f.domain.total_time = 6e-14\n")
     assert _wait_idle(k)
     before = k.output(0)["cfg"]
+    seq0 = k.output(0)["cfg_seq"]
     eid = k.patch([{"path": "domain.cfl", "value": 0.5},
                    {"path": "mesh.dx", "value": 2e-8}])
-    assert _wait_idle(k)
-    d = k.output(0)
+    d = _wait_apply(k, seq0)
     assert (d.get("cfg") or {}).get("domain", {}).get("cfl") == 0.5
     assert (d.get("cfg") or {}).get("mesh", {}).get("dx") == 2e-8
     assert d.get("origin") == "patch", d.get("origin")
@@ -857,13 +897,11 @@ def test_patch_rejects_unknown_verb_and_bad_remove(tmp_path):
     k.submit("from genie.core.simulate import Simulation\n"
              "f = Simulation(client=None)\n"
              "f.domain.total_time = 6e-14\n")
-    assert _wait_idle(k)
-    before = k.output(0)["cfg"]
+    before = _wait_cfg(k)          # 等 cfg 真落地（_wait_idle 有竞态，见该函数）
 
     k.patch([{"verb": "insert", "path": "monitor", "value": {}}])
     text = _wait_text(k, "未知 verb")
     assert "未知 verb" in text, text[-300:]
-
     k.patch([{"verb": "remove", "path": "monitor.7"}])
     assert _wait_idle(k)
     text = _wait_text(k, "下标越界")
