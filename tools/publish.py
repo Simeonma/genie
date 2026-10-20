@@ -47,10 +47,9 @@ def _p(*args: object) -> None:
     print(*args, flush=True)
 
 
-def _run(cmd: list[str], *, cwd: Path = ROOT, check: bool = True,
-         stdin: str | None = None) -> subprocess.CompletedProcess:
-    r = subprocess.run(cmd, cwd=str(cwd), text=True, input=stdin,
-                       capture_output=True, encoding="utf-8", errors="replace")
+def _run(cmd: list[str], *, cwd: Path = ROOT, check: bool = True) -> subprocess.CompletedProcess:
+    r = subprocess.run(cmd, cwd=str(cwd), capture_output=True,
+                       encoding="utf-8", errors="replace")
     if check and r.returncode != 0:
         _p(f"!! 命令失败 ({r.returncode}): {' '.join(cmd)}")
         if r.stdout.strip():
@@ -62,7 +61,20 @@ def _run(cmd: list[str], *, cwd: Path = ROOT, check: bool = True,
 
 
 def _git(*args: str, check: bool = True, stdin: str | None = None) -> str:
-    return _run(["git", *args], check=check, stdin=stdin).stdout
+    """跑 git 并返回 stdout。
+
+    stdin 必须以 **bytes** 传入：Windows 的 subprocess 在文本模式下会把 ``\\n``
+    自动翻成 CRLF，喂给 ``git mktree`` 会变成文件名里的 ``\\r``（踩过）。
+    """
+    if stdin is None:
+        return _run(["git", *args], check=check).stdout
+    r = subprocess.run(["git", *args], cwd=str(ROOT),
+                       input=stdin.encode("utf-8"), capture_output=True)
+    if check and r.returncode != 0:
+        _p(f"!! git {' '.join(args)} 失败", file=sys.stderr)
+        _p(r.stderr.decode("utf-8", "replace").strip(), file=sys.stderr)
+        raise SystemExit(1)
+    return r.stdout.decode("utf-8", "replace")
 
 
 def _fail(msg: str) -> None:
