@@ -189,8 +189,10 @@ def step4_push_main(ver: str) -> None:
 # ── ⑤ dist 孤儿分支（纯管道，不碰工作树）───────────────────────────────────
 def step5_dist(whl: Path, ver: str) -> None:
     _p("── ⑤ 重建 dist 孤儿分支")
+    # git mktree 不接受带斜杠的路径：先造 dist 子树，再套根树。
     blob = _git("hash-object", "-w", str(whl)).strip()
-    tree = _git("mktree", stdin=f"100644 blob {blob}\tdist/{whl.name}\n").strip()
+    sub = _git("mktree", stdin=f"100644 blob {blob}\t{whl.name}\n").strip()
+    tree = _git("mktree", stdin=f"040000 tree {sub}\tdist\n").strip()
     commit = _git("commit-tree", tree, "-m", f"wheel: genie {ver}").strip()
     _git("push", "-q", "--force", "origin", f"{commit}:refs/heads/dist")
     _p(f"   dist 分支 → {commit[:7]}（仅含 dist/{whl.name}）")
