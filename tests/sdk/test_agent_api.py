@@ -13,6 +13,8 @@ from __future__ import annotations
 import subprocess
 import sys
 
+import pytest
+
 import genie
 from genie.integrations.mcp import (TOOL_NAMES, TOOLS, execute_tool,
                                     set_session_factory)
@@ -321,6 +323,21 @@ def test_execute_tool_dispatch_and_unknown():
     assert mats["count"] > 0 and "Au" in mats["models"]
     bad = execute_tool("nope", {})
     assert bad["ok"] is False and "未知工具" in bad["error"]
+
+
+def test_build_server_constructs():
+    """MCP 服务器能构造出来（2026-10-21 补的回归锚）。
+
+    mcp 2.x 把 ``FastMCP`` 改名成 ``MCPServer``，1.x 仍叫 ``FastMCP``——原先
+    只写了 1.x 的 import，于是 ``pyproject`` 声明 ``mcp>=2.0,<3`` 时
+    ``genie-mcp`` 一启动就 ModuleNotFoundError，而测试只摸 TOOLS/execute_tool，
+    从未走过构造路径，所以静默坏了。这里真的构造一次。
+    """
+    pytest.importorskip("mcp")
+    from genie.integrations.mcp import build_server
+    srv = build_server()
+    assert srv is not None
+    assert callable(getattr(srv, "run", None)), "构造出来的服务器没有 run()"
 
 
 def test_import_genie_does_not_pull_fastapi():

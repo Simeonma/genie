@@ -402,12 +402,20 @@ def _openai_tools() -> list[dict]:
 
 
 def build_server():
-    """构建 MCP 服务器（stdio）。mcp 包缺失 → 指路错误。"""
-    try:
-        from mcp.server.fastmcp import FastMCP
-    except ImportError as e:  # pragma: no cover —— 依赖缺失路径
-        raise RuntimeError(
-            'MCP 服务器需要 mcp 包：pip install "genie[agent]"') from e
+    """构建 MCP 服务器（stdio）。mcp 包缺失 → 指路错误。
+
+    两代 SDK 都要认：mcp 2.x 把 ``FastMCP`` 改名为 ``MCPServer``（构造参数、
+    ``.tool()``、``.run()`` 同名），1.x 仍是 ``FastMCP``。pyproject 声明的是
+    ``mcp>=2.0,<3``，所以 2.x 这条是主路径，1.x 保留兼容。
+    """
+    try:                                     # mcp >= 2.0
+        from mcp.server.mcpserver import MCPServer as FastMCP
+    except ImportError:
+        try:                                 # mcp 1.x
+            from mcp.server.fastmcp import FastMCP
+        except ImportError as e:  # pragma: no cover —— 依赖缺失路径
+            raise RuntimeError(
+                'MCP 服务器需要 mcp 包：pip install "genie[agent]"') from e
 
     srv = FastMCP(name="genie",
                   instructions=(
