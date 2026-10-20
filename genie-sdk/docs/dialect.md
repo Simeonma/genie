@@ -100,13 +100,13 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 
 配置对象：`f.domain`（本地 `Domain()`，方言 `domain` 节）。
 
-#### `f.domain.x_range = (lo, hi)`（y/z 同）【方言】
+### `f.domain.x_range = (lo, hi)`（y/z 同）【方言】
 - 功能：设定各轴物理范围。
 - 单位：米。约束：`hi > lo` 且有限（两方同守卫）。
 - 默认：必填。本地构造缺省 `(-0.5µm, 0.5µm)`（z 为 ±1µm），方言必填。
 - 语义注：域范围边缘即 PML 内缘（PML 向外延伸，不占用户域）。
 
-#### `f.domain.total_time = 6e-14`【方言】
+### `f.domain.total_time = 6e-14`【方言】
 - 功能：总物理时长（决定 dt 与监视器积分窗规划）。
 - 单位：秒。约束：必须 > 0（本地在装配期校验，方言在 422 层）。
 - 默认：必填。
@@ -114,10 +114,10 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
   派生量，不在提交时设置），freq 监视器的 DFT/切趾窗按 total_time 规划
   ——想跑长请把 total_time 设够。
 
-#### `f.domain.cfl = 0.9`【方言】
+### `f.domain.cfl = 0.9`【方言】
 - 功能：CFL 系数（dt 缩放）。约束：`0 < cfl <= 1`。默认 `0.9`。
 
-#### `f.domain.boundary_condition(face, kind, **kw)`【方言】
+### `f.domain.boundary_condition(face, kind, **kw)`【方言】
 - 功能：设定某面边界（线格式字段：`boundary`，六面字典）。
   `face ∈ {x_min…z_max}`；`kind ∈ {pec, pmc, periodic, pml, bloch}`。
 - 未设置的面默认 **pec**（不是 pml——横向周期/布洛赫场景务必显式设）。
@@ -140,15 +140,15 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 
 配置对象：`f.mesh`。
 
-#### `f.mesh.dx = 20e-9`【方言】
+### `f.mesh.dx = 20e-9`【方言】
 - 功能：名义格距。单位：米。约束：> 0。必填。
 
-#### `f.mesh.dy / f.mesh.dz`【方言】
+### `f.mesh.dy / f.mesh.dz`【方言】
 - 功能：各轴独立格距。**未设置时静默回退 dx**（各向同性）。
 - 方言注意：线格式中 dy/dz 缺省即回退；显式设置等于 dx 时
   语义相同但配置不同（省略它们是安全的）。
 
-#### `f.mesh.refine(x_range, y_range, z_range, factor=, growth_rate=)`【方言】
+### `f.mesh.refine(x_range, y_range, z_range, factor=, growth_rate=)`【方言】
 - 功能：长方体加密区。factor 为 int 或 `(fx, fy, fz)`，均 **>= 2**；
   growth_rate >= 1.0（默认 1.2）。撤销全部加密区用
   `clear_refinements()`。
@@ -169,7 +169,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 
 配置对象：`f.mat`。三种构造入口 + 查询族。
 
-#### `f.mat.add_const().name('sio2').eps(2.10).mu(1.0)`【方言】
+### `f.mat.add_const().name('sio2').eps(2.10).mu(1.0)`【方言】
 - `name`：必填（装配期校验，重名后写覆盖先写）。
 - `eps` / `mu`：**相对**介电/磁常数（用户传 n²，不是折射率！），
   默认 1.0；约束：有限且 > 0。eps=mu=1 即真空。
@@ -181,7 +181,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 - 查询【方言】：`list_models()` / `has_model(n)` / `count_models` /
   `remove_model(n)` / `clear_models()`（本地与 SDK 同名同行为）。
 
-#### `f.mat.add_lorentz().name('ag').eps_inf(2.0).mu_inf(1.0)...`【方言】
+### `f.mat.add_lorentz().name('ag').eps_inf(2.0).mu_inf(1.0)...`【方言】
 - `eps_inf` / `mu_inf`：高频极限相对常数，> 0 有限，默认 1.0
   （> 0 守卫在 api/方言层；内核 L1 接受任意有限值）。
 - 极点追加——落入线格式的 `poles` / `mu_poles` 两个列表；**每 pole
@@ -216,7 +216,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
   增益=负 Δε（ωp²<0）通道接受（见上 M2 定案）；γ<0 负阻尼被内核 L1 硬拒
   （schema 层不拦，作业 build 期报错）。
 
-#### `f.mat.add_from_library('Au', name='au', fit_range=(lo,hi), n_drude=1, n_lorentz=2, maxfev=5000)`【方言】
+### `f.mat.add_from_library('Au', name='au', fit_range=(lo,hi), n_drude=1, n_lorentz=2, maxfev=5000)`【方言】
 - 功能：从 n-k 材质库生成色散材料——**客户端展开糖**（F1 2026-09
   定案：fit 全归服务仓，内核 pole-only）。SDK 内部立即
   `genie.material.load_library_nk`（优先 SDK 自带本地库
@@ -264,22 +264,22 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 纯表现层，求解器不消费；缺省时前端回退到类型名（"Box" / "N-gon"）。
 不在装配期占用唯一性（**同名不报错**，重名会得到两行同名）。
 
-#### `f.geom.add_box().material('sio2').x_range(lo,hi).y_range(lo,hi).z_range(lo,hi).priority(1)`【方言】
+### `f.geom.add_box().material('sio2').x_range(lo,hi).y_range(lo,hi).z_range(lo,hi).priority(1)`【方言】
 - `material`：引用材料名（**必须已在 f.mat 定义**，装配期校验）。
 - 各 range：`hi > lo`。`priority`：整数默认 0（重叠区域高优先者胜）。
 
-#### `f.geom.add_sphere().material('m').center(x,y,z).radius(r).priority(n)`【方言】
+### `f.geom.add_sphere().material('m').center(x,y,z).radius(r).priority(n)`【方言】
 - center 默认 (0,0,0)；radius > 0 必填（米）。
 
-#### `f.geom.add_cylinder().material('m').center(...).radius(r).height(h).priority(n)`【方言】
+### `f.geom.add_cylinder().material('m').center(...).radius(r).height(h).priority(n)`【方言】
 - radius > 0、height > 0 必填（米）。
 
-#### `f.geom.add_ngon_z().material('m').center(...).n_sides(n).circumradius(r).height(h).priority(n)`【方言】
+### `f.geom.add_ngon_z().material('m').center(...).n_sides(n).circumradius(r).height(h).priority(n)`【方言】
 - 功能：正 n 边形（z 轴挤出）——孔阵/柱阵的主力形状。
 - `n_sides`：整数 **>= 3**（n=2 会使结构退化消失）；`circumradius`、
   `height` > 0（米）。center 默认 (0,0,0)。
 
-#### `f.geom.add_polygon_z().material('m').vertices([(x, y), ...]).z_range(lo,hi).priority(n)`【方言】
+### `f.geom.add_polygon_z().material('m').vertices([(x, y), ...]).z_range(lo,hi).priority(n)`【方言】
 - 功能：任意多边形（z 轴挤出）——超表面单元形状。
 - `vertices`：(x, y) 对列表，至少 3 点，坐标有限（米）。
   **子多边形分隔哨兵**：JSON 提交用 `[null, null]` 对（JSON 严格语法
@@ -288,16 +288,16 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
   顶点（内核装配期校验）。
 - `z_range`：`hi > lo` 必填。
 
-#### `f.geom.add_ellipse_z().material('m').center(...).rx(rx).ry(ry).height(h).priority(n)`【方言】
+### `f.geom.add_ellipse_z().material('m').center(...).rx(rx).ry(ry).height(h).priority(n)`【方言】
 - 功能：椭圆（z 轴挤出）——椭圆孔/椭圆波导（2026-09 开放）。
 - `rx`、`ry`、`height` > 0 必填（米）；center 默认 (0,0,0)。
 
-#### `f.geom.add_ring_z().material('m').center(...).inner_radius(ri).outer_radius(ro).height(h).priority(n)`【方言】
+### `f.geom.add_ring_z().material('m').center(...).inner_radius(ri).outer_radius(ro).height(h).priority(n)`【方言】
 - 功能：圆环（z 轴挤出）——环缝谐振器主力形状（2026-09 开放）。
 - `inner_radius` >= 0（**0 = 实心盘**）；`outer_radius` > 0 且
   `inner < outer`（schema 期拒）；`height` > 0（米）。
 
-#### `f.geom.add_polygon_swept().material('m').vertices([...]).z_range(lo,hi).tilt(dx_dz,dy_dz).priority(n)`【方言】
+### `f.geom.add_polygon_swept().material('m').vertices([...]).z_range(lo,hi).tilt(dx_dz,dy_dz).priority(n)`【方言】
 - 功能：带斜切（shear）的 z 轴挤出多边形——斜纹超表面/倾斜光栅
   （2026-09 开放）。
 - `vertices`/`z_range` 语义同 `polygon_z`（哨兵对同一手）。
@@ -314,7 +314,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 
 配置对象：`f.src`。三入口；前四个时域参数三入口共享。
 
-#### 共享时序参数【方言】
+### 共享时序参数【方言】
 - `freq(f)`：载波，Hz，**> 0** 必填。
 - `bandwidth(bw)`：Hz，**> 0** 必填（准 CW 用小正带宽，0 被拒）。
   **口径声明**（2026-09-07 内核 L2 审查批 β，行为不变）：`bw` 是高斯
@@ -325,13 +325,13 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 - `phase(p)`：弧度，默认 0。
 - `name(n)`：可选；**未命名的源被能量诊断跳过**——建议总命名。
 
-#### `f.src.add_soft_source()`【方言】
+### `f.src.add_soft_source()`【方言】
 - `center(x,y,z)` 米（必填）；`size(sx,sy,sz)` 米（每槽 <=0 = 该轴
   单格；不调用 = 点源）；`polarization(px,py,pz)` 复数分量，默认
   (1,0,0)=Ex（方言线格式 `[re, im]×3` 对，虚部表达圆/椭圆偏振）；
 - `amplitude(a)` 默认 1.0；`kind('electric'|'magnetic')` 默认前者。
 
-#### `f.src.add_plane_wave()`（均匀平面波 TF/SF）【方言】
+### `f.src.add_plane_wave()`（均匀平面波 TF/SF）【方言】
 - `direction('+'|'-')` 默认 '+'；`amplitude` 默认 1.0。
 - `center(x,y,z)`：注入面横轴中心，默认域心。
 - `theta/phi/psi`（度）：theta ∈ [0,180] 闭区间；phi/psi ∈ [0,360)
@@ -353,7 +353,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
   from_face 段（修复档案段二.44）：stop ≥ t0 + d_max/cosθ + 3σ +
   width/2。按此设窗即可用 from_face 做定量透过率。
 
-#### `f.src.add_gaussian_beam()`【方言】
+### `f.src.add_gaussian_beam()`【方言】
 - 平面波全参数 + `radius(w0)`（米，**必填**，缺省 422）：源平面孔径
   半径（3σ）；1/e² 强度束宽 ≈ 0.47·radius。
 
@@ -365,7 +365,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 
 配置对象：`f.mon`。三类；前四参数共享。
 
-#### 共享参数【方言】
+### 共享参数【方言】
 - `name(n)`：**方言必填**（本地可匿名但不可按名检索）；**同类内
   重名被拒**，跨类同名合法。
 - `center(x,y,z)` 米，默认 (0,0,0)。
@@ -379,11 +379,11 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
   或先验轴序（看首两点哪个坐标在变）；详见下游坑库 pitfalls-genie.md「npz 存储与读取
   方言合集」条。
 
-#### `f.mon.add_time()`【方言】
+### `f.mon.add_time()`【方言】
 - `down_sample(time_window=None, stride=1)`：窗（秒，正序）+ 步长
   （>= 1；非整数截断并警告）。
 
-#### `f.mon.add_freq()`【方言】
+### `f.mon.add_freq()`【方言】
 - `freq(center, bw, n)`（全 Hz；n 点数）：`bw >= 0`、
   `center - bw/2 >= 0`、`n >= 1`。
 - `apodize(side=None, time_window=None, width=None)`：
@@ -391,14 +391,14 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 - 陷阱：谱窗按 total_time 规划——**透过率/频谱定量场景建议显式
   apodize 到首程脉冲窗**，防 PML 回波污染（回波时序 ~ 域长/c）。
 
-#### `f.mon.add_index()`【方言】
+### `f.mon.add_index()`【方言】
 - 介电/磁导率分布观测，装配后即可取（无需 run）。
 
 ---
 
 ## Run 与结果
 
-#### `f.run(gpu=None, timeout_s=None, poll_interval=2.0, progress=None)`【服务端】
+### `f.run(gpu=None, timeout_s=None, poll_interval=2.0, progress=None)`【服务端】
 
 - 提交并等待到终态。**不接受位置步数参数**（G18 起 `run.n_steps` 已删）：
   仿真时长唯一旋钮是 `domain.total_time`（SI 秒，>0 必填），作业推进到
@@ -412,7 +412,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
   是调度器的实现细节。
 
 
-#### `f.get_time(name)` / `f.get_freq(name=None)` / `f.get_index(name=None)`【服务端】
+### `f.get_time(name)` / `f.get_freq(name=None)` / `f.get_index(name=None)`【服务端】
 - 功能：取结果（隐含 download；npz 只拉一次，按监视器缓存）。
 - name 缺省取第一个该类监视器。返回纯数据对象：
   - TimeResult：`.time`、`.fields{分量:数组}`、`.x/.y/.z`
@@ -422,10 +422,10 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 - **零计算定案**：结果对象不含任何派生量方法；透过率/通量读
   `f.digest()`（面/体监视器；数字服务端算好），或拿裸分量自算。
 
-#### `f.summary()`【服务端】
+### `f.summary()`【服务端】
 - 返回 `{grid_shape, dt, n_steps, monitors}` 装配元信息。
 
-#### `f.digest(job_id=None)`【服务端】
+### `f.digest(job_id=None)`【服务端】
 - 功能：取结果数值摘要——各监视器峰频/幅值；面监视器含透过率
   min/max/中心频值（`normalized=true` 才是物理 T；**点监视器无面积分
   不含 T**——已知方言边界）。数字服务端算好、**读取零 GPU、不拉 npz**：
@@ -433,7 +433,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
 - `job_id` 缺省用本实例已提交的作业；未提交且未传 → 报错指路。
 - 与 MCP 工具 `get_job_digest` 同一端点、同一读数（人类与 agent 共用）。
 
-#### `f.to_config()` / `f.to_script()`【服务端】
+### `f.to_config()` / `f.to_script()`【服务端】
 - 功能：导出。`to_config()` → SimConfig JSON 深拷贝（即提交体）；
   `to_script()` → 等价 genie 脚本文本（与 Studio 生成器逐字节一致，
   分享/溯源/论文用）。**重建/复制仿真的唯一公开路径 = `to_script()`
@@ -451,7 +451,7 @@ Studio 里有一份**活着的模型**（会话的 `f`）。改它有四条路�
   `run_script` 以 `script` 传完整 genie 脚本文本（浏览器执行，
   服务端零执行）。
 
-#### 本地专属（未进方言）
+### 本地专属（未进方言）
 - `f.build()`（本地装配触发 GPU 编译；云端提交隐含在 run 里）、
   `f.grid()`（网格预览，需 GPU）、`f.field_arrays`、
   `f.dt/n_steps/grid_shape` 属性（云端经 summary 获取）。
@@ -669,7 +669,7 @@ NV 链选卡）见后续版本说明。线格式 JSON 形状::
 缺省 `product`）两种形态都可用——**便利形态也能表达 zip 扫描**；
 轴名/互斥/点数上限的校验权威在服务端（422 逐条透传）。
 
-#### SweepHandle 方法表
+### SweepHandle 方法表
 
 | 方法 | 语义 |
 |---|---|

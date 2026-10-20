@@ -1,6 +1,6 @@
 # 给 agent 的入口 —— 用代码驱动 Studio
 
-> 这一页写给**模型/agent**（写给人看的是 [快速上手](commands/quickstart.html)）。
+> 这一页写给**模型/agent**（写给人看的是 [快速上手](../manual/commands/quickstart.html)）。
 > 读它就够开始干活；字段级语义见 [dialect.md](dialect.md)。
 
 前提：用户已经把 `genie studio` 跑起来了，浏览器里有一份**他正在看的模型**。

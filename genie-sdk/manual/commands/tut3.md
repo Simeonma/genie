@@ -229,6 +229,6 @@ are known before the first run.
 
 ## Continue
 
-- Exact parameter tables: [01 · f.domain](f-domain-physical-domain-boundaries.html)
-  and [02 · f.mesh](f-mesh-grid-local-refinement.html)
+- Exact parameter tables: [01 · f.domain](01-domain.html)
+  and [02 · f.mesh](02-mesh.html)
 - Putting it together: [Quickstart](quickstart.html)

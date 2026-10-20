@@ -18,7 +18,7 @@ missing name is only caught at the submission boundary, as `GenieConfigError`
 Diagnostic: check that every `'{...}'` slot has a matching key in your
 `f.parameters()` calls (repeated calls merge, they don't replace).
 Fix: define the parameter before submitting — see
-[f-submit-lifecycle.html](f-submit-lifecycle.html).
+[f-submit-lifecycle.html](07-run.html).
 
 **Cause: building a configuration by editing a raw SimConfig JSON dict.**
 The chained APIs (`f.domain/mat/geom/src/mon` + `f.parameters()`) never
@@ -27,7 +27,7 @@ hand-authoring surface.
 Diagnostic: how did the JSON come to be — hand-written or copy-pasted?
 Fix: rebuild that part with the chained APIs; to inspect the current
 configuration read `f.to_config()` (read-only) — see
-[f-submit-lifecycle.html](f-submit-lifecycle.html).
+[f-submit-lifecycle.html](07-run.html).
 
 **Cause: units written in the wrong scale.** `f.mesh.dx = 25` when you meant
 25 nm makes the domain orders of magnitude smaller than the grid — `min_cells`
@@ -35,16 +35,16 @@ rejects it (a 422 mentioning "min_cells") or the cell count explodes.
 Likewise `fit_range` in nm errors the fit.
 Diagnostic: print the value and ask "is this meters?"
 Fix: write SI everywhere (`25e-9`) — see
-[f-mesh-grid-local-refinement.html](f-mesh-grid-local-refinement.html) and
-[f-mat-materials-registry.html](f-mat-materials-registry.html).
+[f-mesh-grid-local-refinement.html](02-mesh.html) and
+[f-mat-materials-registry.html](03-mat.html).
 
 **Cause: structurally invalid values.** Reversed domain ranges `(hi, lo)` are
 rejected at submit; int slots (`max_refinement`, `min_cells`) reject floats
 with `TypeError`; a negative constant ε for a metal is rejected outright.
 Diagnostic: match the error text to the parameter table on the relevant page.
 Fix: poles for metals, `lo < hi` tuples, ints as ints — see
-[f-domain-physical-domain-boundaries.html](f-domain-physical-domain-boundaries.html)
-and [f-mat-materials-registry.html](f-mat-materials-registry.html).
+[f-domain-physical-domain-boundaries.html](01-domain.html)
+and [f-mat-materials-registry.html](03-mat.html).
 
 ## The spectrum looks wrong
 
@@ -60,8 +60,8 @@ at the end of the record, every spectrum from this run is window-contaminated.
 Fix: `total_time ≳ 3τ` (for Q at f₀: `τ = Q/(π·f₀)`); `apodize('both', …)`
 (Hann window, −31.5 dB sidelobes) is mitigation at 2× resolution cost. No
 post-processing of the spectrum can undo it — see
-[reading-results.html](reading-results.html) and
-[sources-and-monitors.html](sources-and-monitors.html).
+[reading-results.html](tut6.html) and
+[sources-and-monitors.html](tut5.html).
 
 **Cause: insufficient spectral resolution.** Achievable resolution is
 `Δf = 1/total_time`; if that is not comfortably finer than the feature width
@@ -70,8 +70,8 @@ physics'. Worked example: `T = 2 ps` gives 500 GHz against a true 96.5 GHz
 linewidth — the extracted Q comes out ~5× too low regardless of the cavity.
 Diagnostic: compare `Δf = 1/T` with `f₀/Q` for every resonance you intend to
 quote.
-Fix: run longer — see [reading-results.html](reading-results.html) and
-[boundaries-and-domain-size.html](boundaries-and-domain-size.html).
+Fix: run longer — see [reading-results.html](tut6.html) and
+[boundaries-and-domain-size.html](tut3.html).
 
 **Cause: wrong geometry was built.** A simulation of the wrong structure
 produces perfectly plausible fields of the wrong structure; priority
@@ -80,15 +80,15 @@ in the fields.
 Diagnostic: one index monitor (`f.mon.add_index().name('ix').field('both')`)
 read as an image — it shows the built `ε(r)`, the solver's ground truth.
 Fix: correct geometry/priority before rerunning — see
-[f-mon-monitors.html](f-mon-monitors.html) and
-[f-geom-geometry.html](f-geom-geometry.html).
+[f-mon-monitors.html](06-mon.html) and
+[f-geom-geometry.html](04-geom.html).
 
 **Cause: source bandwidth misses the feature.** The Gaussian pulse's
 `bandwidth` sets which spectrum is excited; features outside or near its edge
 are not measured meaningfully.
 Diagnostic: overlay your band of interest with `[center − bw/2, center + bw/2]`.
 Fix: widen or recenter the pulse — see
-[f-src-sources.html](f-src-sources.html).
+[f-src-sources.html](05-src.html).
 
 ## Transmission is not between 0 and 1
 
@@ -103,8 +103,8 @@ Diagnostic: does the plot trace the source spectrum? Then it is the pulse,
 not the physics.
 Fix: use server-computed numbers in `f.digest()` marked `normalized=true`
 (physical T), or perform an explicit two-run ratio — see
-[sources-and-monitors.html](sources-and-monitors.html) and
-[reading-results.html](reading-results.html).
+[sources-and-monitors.html](tut5.html) and
+[reading-results.html](tut6.html).
 
 **Cause: point monitor where a plane is needed.** Point monitors have no area
 integral and carry no T — `digest()` only reports physical transmittance for
@@ -112,7 +112,7 @@ plane monitors, and only when `normalized=true`.
 Diagnostic: check your monitor's `size` — a default time/freq monitor is a
 `(0,0,0)` point monitor.
 Fix: give it extent (e.g. `.size(1e-6, 1e-6, 0)`) — see
-[f-mon-monitors.html](f-mon-monitors.html).
+[f-mon-monitors.html](06-mon.html).
 
 **Cause: R + T + A > 1 for a lossy problem.** The conservation identity
 should close to within a few percent; violation points at a too-small box or
@@ -120,8 +120,8 @@ a truncated resonance.
 Diagnostic: run the normalization check (identity closure) from the
 post-processing checklist.
 Fix: enlarge the domain, extend `total_time` — see
-[reading-results.html](reading-results.html) and
-[boundaries-and-domain-size.html](boundaries-and-domain-size.html).
+[reading-results.html](tut6.html) and
+[boundaries-and-domain-size.html](tut3.html).
 
 ## Fields look unphysical near the edges
 
@@ -134,8 +134,8 @@ with any physical mechanism. They have no physical meaning.
 Diagnostic: check monitor coordinates against the domain ranges and PML
 thickness.
 Fix: face monitors belong between structure and PML, never inside it — see
-[f-mon-monitors.html](f-mon-monitors.html) and
-[reading-results.html](reading-results.html).
+[f-mon-monitors.html](06-mon.html) and
+[reading-results.html](tut6.html).
 
 **Cause: monitor inside the source window.** Inside the TFSF window (or at
 the source plane) you record incident + scattered coherently mixed; at
@@ -144,23 +144,23 @@ dips for reasons that have nothing to do with the structure.
 Diagnostic: move the monitor a few cells away from the source window and
 compare.
 Fix: keep monitors a few cells clear of the source plane — see
-[f-src-sources.html](f-src-sources.html) and
-[sources-and-monitors.html](sources-and-monitors.html).
+[f-src-sources.html](05-src.html) and
+[sources-and-monitors.html](tut5.html).
 
 **Cause: a non-absorbing face where light exits.** If light can reach a face
 without an absorbing boundary there, reflections contaminate the readings.
 Diagnostic: trace the propagation path; both entrance and exit faces need
 PML (e.g. plane wave `from_face('x_min')` → PML on both x faces).
 Fix: `f.domain.boundary_condition(face, 'pml')` on each — see
-[f-domain-physical-domain-boundaries.html](f-domain-physical-domain-boundaries.html).
+[f-domain-physical-domain-boundaries.html](01-domain.html).
 
 **Cause: `periodic` at oblique incidence.** `periodic` is valid only for
 normal incidence; oblique incidence on a repeating structure silently gives
 wrong interference — the most common boundary mistake in metasurface work.
 Diagnostic: is the source oblique (`theta`/`phi`) with `periodic` sides?
 Fix: `bloch` with `from_source=True` (or explicit `k`) — see
-[boundaries-and-domain-size.html](boundaries-and-domain-size.html) and
-[f-domain-physical-domain-boundaries.html](f-domain-physical-domain-boundaries.html).
+[boundaries-and-domain-size.html](tut3.html) and
+[f-domain-physical-domain-boundaries.html](01-domain.html).
 
 ## The sweep is slow or points fail
 
@@ -172,7 +172,7 @@ the sweep is serialized on the server regardless of GPU availability.
 Diagnostic: check the `max_parallel` you passed (allowed 1–16) and
 `gpus_per_sim` (1–8).
 Fix: raise `max_parallel` to match idle GPUs — see
-[sweep-f-sweep-sweephandle.html](sweep-f-sweep-sweephandle.html).
+[sweep-f-sweep-sweephandle.html](08-sweep.html).
 
 **Cause: one failed point read as total failure.** Under the default
 `on_failure="continue"` the remaining points run anyway; failed points return
@@ -181,7 +181,7 @@ Diagnostic: `h.rollup` for the `{succeeded, failed, canceled}` breakdown and
 `h.points()` per point; if one bad configuration fails everywhere, consider
 `on_failure="abort"`.
 Fix: inspect the failing point's config, or switch the failure mode — see
-[sweep-f-sweep-sweephandle.html](sweep-f-sweep-sweephandle.html).
+[sweep-f-sweep-sweephandle.html](08-sweep.html).
 
 **Cause: more points than intended — `product` vs `zip`.** Multiple axes
 default to `mode="product"` (Cartesian product): two 6-point axes are 36
@@ -189,15 +189,15 @@ simulations, not 6.
 Diagnostic: compare the point count in `h.status()` with what you expected.
 Fix: `mode="zip"` to pair axis points element-wise, or a fully-controlled
 `sweep` SweepSpec dict (which wins if both `sweep` and `parameters` are
-given) — see [sweep-f-sweep-sweephandle.html](sweep-f-sweep-sweephandle.html).
+given) — see [sweep-f-sweep-sweephandle.html](08-sweep.html).
 
 **Cause: sweeping a config locked by `f.run()`.** The sweep's base config
 defaults to `to_config()` — the *current* configuration, which is locked
 after a run; axes can only vary parameter names, not literals.
 Diagnostic: did you call `f.run()` on this instance before `f.sweep()`?
 Fix: build the parameterized configuration and sweep it without running
-first — see [sweep-f-sweep-sweephandle.html](sweep-f-sweep-sweephandle.html)
-and [f-submit-lifecycle.html](f-submit-lifecycle.html).
+first — see [sweep-f-sweep-sweephandle.html](08-sweep.html)
+and [f-submit-lifecycle.html](07-run.html).
 
 ## Results are empty or stale
 
@@ -211,16 +211,16 @@ instance, or with no `job_id`, raises `RuntimeError`.
 Diagnostic: `f.summary()` — it reports state and job_id.
 Fix: rerun or wait; use the returned instance, not a fresh `genie.connect()`,
 for `get_freq`/`digest` — see
-[f-submit-lifecycle.html](f-submit-lifecycle.html) and
-[results-get-simdata.html](results-get-simdata.html).
+[f-submit-lifecycle.html](07-run.html) and
+[results-get-simdata.html](09-results.html).
 
 **Cause: wrong monitor name.** Results are grouped by monitor `name`; a wrong
 name raises `KeyError` with a hint.
 Diagnostic: compare the name you passed with your `f.mon` list — or with the
 group list in the results file.
 Fix: use the exact monitor name — see
-[f-mon-monitors.html](f-mon-monitors.html) and
-[results-get-simdata.html](results-get-simdata.html).
+[f-mon-monitors.html](06-mon.html) and
+[results-get-simdata.html](09-results.html).
 
 **Cause: file from a different version of the configuration.** The results
 file's group list mirrors your monitor list; a mismatch means the file
@@ -231,8 +231,8 @@ grid, timestamps) answers "what actually ran".
 Fix: rerun; the auto-download writes `<job_id>_results.h5` under
 `$GENIE_RESULT_DIR` (default `./genie_results/`), and `results()` re-fetches
 on demand if the download only warned — see
-[reading-results.html](reading-results.html) and
-[results-get-simdata.html](results-get-simdata.html).
+[reading-results.html](tut6.html) and
+[results-get-simdata.html](09-results.html).
 
 **Cause: reusing a submitted instance for a changed run.** A `Simulation`
 submits at most once; after `f.run()` the configuration is locked, and
@@ -240,4 +240,4 @@ passing parameters again raises `RuntimeError` — so a rerun quietly never
 happened and you are reading the old job.
 Diagnostic: did the rerun raise before you got here?
 Fix: export `f.to_script()`, tweak the script, and run it on a fresh
-`genie.connect()` instance — see [f-submit-lifecycle.html](f-submit-lifecycle.html).
+`genie.connect()` instance — see [f-submit-lifecycle.html](07-run.html).

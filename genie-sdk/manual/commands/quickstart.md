@@ -56,13 +56,13 @@ f.run()
 
 | Step | Page | In one line |
 |---|---|---|
-| domain + PML | [01 · f.domain](f-domain-physical-domain-boundaries.html) | Simulation box, total time, absorbing boundaries on x_min/x_max |
-| mesh | [02 · f.mesh](f-mesh-grid-local-refinement.html) | 15 nm fine axis along the grating, 30 nm elsewhere |
-| material | [03 · f.mat](f-mat-materials-registry.html) | Register `sio2` (ε=2.1) — geometry references it by name |
-| geometry | [04 · f.geom](f-geom-geometry.html) | A `for` loop stamps out N boxes — N executions, N nodes |
-| source | [05 · f.src](f-src-sources.html) | Plane wave from face `x_min`, centered 330 THz |
-| monitor | [06 · f.mon](f-mon-monitors.html) | Frequency monitor `tr` behind the grating, 300 points |
-| run | [07 · f — submit & lifecycle](f-submit-lifecycle.html) | Submit + poll; results auto-download on success |
+| domain + PML | [01 · f.domain](01-domain.html) | Simulation box, total time, absorbing boundaries on x_min/x_max |
+| mesh | [02 · f.mesh](02-mesh.html) | 15 nm fine axis along the grating, 30 nm elsewhere |
+| material | [03 · f.mat](03-mat.html) | Register `sio2` (ε=2.1) — geometry references it by name |
+| geometry | [04 · f.geom](04-geom.html) | A `for` loop stamps out N boxes — N executions, N nodes |
+| source | [05 · f.src](05-src.html) | Plane wave from face `x_min`, centered 330 THz |
+| monitor | [06 · f.mon](06-mon.html) | Frequency monitor `tr` behind the grating, 300 points |
+| run | [07 · f — submit & lifecycle](07-run.html) | Submit + poll; results auto-download on success |
 
 ## Read the results
 
@@ -79,11 +79,11 @@ data.plot('tr', 'Ex')        # quick matplotlib plot (optional dependency)
 print(f.digest())            # numeric summary (server-computed, zero-GPU)
 ```
 
-See [09 · results](results-get-simdata.html) for the full data surface.
+See [09 · results](09-results.html) for the full data surface.
 
 ## Where to go next
 
-- Parameterize the pitch and scan it: [08 · sweep](sweep-f-sweep-sweephandle.html)
-- Metals and dispersion: [03 · f.mat](f-mat-materials-registry.html)
+- Parameterize the pitch and scan it: [08 · sweep](08-sweep.html)
+- Metals and dispersion: [03 · f.mat](03-mat.html)
   (`add_lorentz`, `add_from_library`)
-- Ready-made structures (gratings, rings): [11 · genie.lib](genie-lib-parametric-device-library.html)
+- Ready-made structures (gratings, rings): [11 · genie.lib](11-lib.html)

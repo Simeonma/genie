@@ -372,13 +372,13 @@ f.<span class="fn">run</span>()</code></pre>
 <h2 id="what-each-step-does"><a class="anchor" href="#what-each-step-does" aria-label="Link to this section">#</a>What each step does</h2>
 <div class="tblwrap"><table>
 <thead><tr><th>Step</th><th>Page</th><th>In one line</th></tr></thead><tbody>
-<tr><td>domain + PML</td><td><a href="f-domain-physical-domain-boundaries.html">01 · f.domain</a></td><td>Simulation box, total time, absorbing boundaries on x_min/x_max</td></tr>
-<tr><td>mesh</td><td><a href="f-mesh-grid-local-refinement.html">02 · f.mesh</a></td><td>15 nm fine axis along the grating, 30 nm elsewhere</td></tr>
-<tr><td>material</td><td><a href="f-mat-materials-registry.html">03 · f.mat</a></td><td>Register <code>sio2</code> (ε=2.1) — geometry references it by name</td></tr>
-<tr><td>geometry</td><td><a href="f-geom-geometry.html">04 · f.geom</a></td><td>A <code>for</code> loop stamps out N boxes — N executions, N nodes</td></tr>
-<tr><td>source</td><td><a href="f-src-sources.html">05 · f.src</a></td><td>Plane wave from face <code>x_min</code>, centered 330 THz</td></tr>
-<tr><td>monitor</td><td><a href="f-mon-monitors.html">06 · f.mon</a></td><td>Frequency monitor <code>tr</code> behind the grating, 300 points</td></tr>
-<tr><td>run</td><td><a href="f-submit-lifecycle.html">07 · f — submit &amp; lifecycle</a></td><td>Submit + poll; results auto-download on success</td></tr>
+<tr><td>domain + PML</td><td><a href="01-domain.html">01 · f.domain</a></td><td>Simulation box, total time, absorbing boundaries on x_min/x_max</td></tr>
+<tr><td>mesh</td><td><a href="02-mesh.html">02 · f.mesh</a></td><td>15 nm fine axis along the grating, 30 nm elsewhere</td></tr>
+<tr><td>material</td><td><a href="03-mat.html">03 · f.mat</a></td><td>Register <code>sio2</code> (ε=2.1) — geometry references it by name</td></tr>
+<tr><td>geometry</td><td><a href="04-geom.html">04 · f.geom</a></td><td>A <code>for</code> loop stamps out N boxes — N executions, N nodes</td></tr>
+<tr><td>source</td><td><a href="05-src.html">05 · f.src</a></td><td>Plane wave from face <code>x_min</code>, centered 330 THz</td></tr>
+<tr><td>monitor</td><td><a href="06-mon.html">06 · f.mon</a></td><td>Frequency monitor <code>tr</code> behind the grating, 300 points</td></tr>
+<tr><td>run</td><td><a href="07-run.html">07 · f — submit &amp; lifecycle</a></td><td>Submit + poll; results auto-download on success</td></tr>
 </tbody></table></div>
 <h2 id="read-the-results"><a class="anchor" href="#read-the-results" aria-label="Link to this section">#</a>Read the results</h2>
 <p><code>f.run()</code> returns after the job reaches a terminal state and the result file has been auto-downloaded. Three ways in:</p>
@@ -389,9 +389,9 @@ data = f.<span class="fn">results</span>()           <span class="cm"># full h5 
 data.<span class="fn">plot</span>(<span class="str">&#x27;tr&#x27;</span>, <span class="str">&#x27;Ex&#x27;</span>)        <span class="cm"># quick matplotlib plot (optional dependency)</span>
 
 <span class="fn">print</span>(f.<span class="fn">digest</span>())            <span class="cm"># numeric summary (server-computed, zero-GPU)</span></code></pre>
-<p>See <a href="results-get-simdata.html">09 · results</a> for the full data surface.</p>
+<p>See <a href="09-results.html">09 · results</a> for the full data surface.</p>
 <h2 id="where-to-go-next"><a class="anchor" href="#where-to-go-next" aria-label="Link to this section">#</a>Where to go next</h2>
-<ul><li>Parameterize the pitch and scan it: <a href="sweep-f-sweep-sweephandle.html">08 · sweep</a></li><li>Metals and dispersion: <a href="f-mat-materials-registry.html">03 · f.mat</a> (<code>add_lorentz</code>, <code>add_from_library</code>)</li><li>Ready-made structures (gratings, rings): <a href="genie-lib-parametric-device-library.html">11 · genie.lib</a></li></ul></div>
+<ul><li>Parameterize the pitch and scan it: <a href="08-sweep.html">08 · sweep</a></li><li>Metals and dispersion: <a href="03-mat.html">03 · f.mat</a> (<code>add_lorentz</code>, <code>add_from_library</code>)</li><li>Ready-made structures (gratings, rings): <a href="11-lib.html">11 · genie.lib</a></li></ul></div>
 <div class="pagenav"><a href="faq.html"><div class="dir">← Previous</div><div class="tt">FAQ</div></a><a class="next" href="troubleshooting.html"><div class="dir">Next →</div><div class="tt">Troubleshooting</div></a></div>
 </main>
 <script>

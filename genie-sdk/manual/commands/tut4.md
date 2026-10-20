@@ -245,7 +245,7 @@ rejected. Axis-independent parameters = stack several poles.
 You rarely fit poles by hand. `f.mat.add_from_library('Au', …)` loads
 bundled n-k data, fits `ε∞ + poles` on the client (same results as the
 service-side fitter, golden-locked), and registers the lorentz node —
-see [10 · genie.material](genie-material-n-k-fitting-library.html) for
+see [10 · genie.material](10-fit-nk.html) for
 `fit_range`, pole-count trade-offs, and fitting your own data.
 
 The workflow exists because handbook data arrives as tables of n and k,

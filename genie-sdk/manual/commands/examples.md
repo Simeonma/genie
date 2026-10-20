@@ -13,7 +13,7 @@ suppression where the Bragg condition `2·(n_line·d + n_gap·(Λ − d)) = m·�
 is met inside the stack. You learn the full connect → domain → mesh → mat →
 geom → src → mon → run → get_freq loop, and how a period-`Λ` structure
 shapes a spectrum. The teeth are stamped by the `genie.lib.grating` helper
-(documented in [11 · genie.lib](genie-lib-parametric-device-library.html))
+(documented in [11 · genie.lib](11-lib.html))
 instead of a hand-written loop.
 
 ```python

@@ -181,7 +181,7 @@ f.run()              # submit → queue → GPU build → march to total_time �
 POSTs, then polls until the job reaches a terminal state
 (`defined → built → running → done`). On success the result file is
 auto-downloaded next to your script. See
-[07 · f — submit & lifecycle](f-submit-lifecycle.html) for `cancel`,
+[07 · f — submit & lifecycle](07-run.html) for `cancel`,
 `timeout_s`, and multi-GPU options.
 
 The state machine is worth knowing because each transition is a distinct
@@ -198,7 +198,7 @@ Budget your experiments against that number and you will rarely wait.
 
 ## Continue
 
-- Exact fields and defaults per namespace: [01](f-domain-physical-domain-boundaries.html)
-  · [02](f-mesh-grid-local-refinement.html) · [03](f-mat-materials-registry.html)
-  · [04](f-geom-geometry.html) · [05](f-src-sources.html) · [06](f-mon-monitors.html)
+- Exact fields and defaults per namespace: [01](01-domain.html)
+  · [02](02-mesh.html) · [03](03-mat.html)
+  · [04](04-geom.html) · [05](05-src.html) · [06](06-mon.html)
 - A complete working example: [Quickstart](quickstart.html)

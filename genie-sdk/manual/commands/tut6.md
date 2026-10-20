@@ -69,7 +69,7 @@ the record is a hard warning that every spectrum from this run is
 window-contaminated.
 
 **Freq monitor** → complex DFT amplitudes `Ẽ(fₖ)` (see
-[Tutorial 5](sources-and-monitors.html)). The magnitude squared is the
+[Tutorial 5](tut5.html)). The magnitude squared is the
 spectral intensity:
 
 ```math
@@ -117,7 +117,7 @@ amplitude has not decayed below `e^{−π}` (≈ 4%) by `T`, sidelobes at the
 −13 dB level of the rectangle window ride on your spectrum. Diagnose
 with a time monitor; fix with `total_time ≳ 3τ` (or `apodize` as
 mitigation, at 2× resolution cost — see
-[Tutorial 5](sources-and-monitors.html)).
+[Tutorial 5](tut5.html)).
 
 The mechanism bears spelling out, because the corruption is spectral and
 therefore invisible in the spectrum's overall shape. The DFT assumed a
@@ -233,6 +233,6 @@ of looking.
 
 ## Continue
 
-- Full data surface: [09 · results](results-get-simdata.html)
+- Full data surface: [09 · results](09-results.html)
 - Server-side summaries without files: `f.digest()` in
-  [07 · f — submit & lifecycle](f-submit-lifecycle.html)
+  [07 · f — submit & lifecycle](07-run.html)

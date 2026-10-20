@@ -103,7 +103,7 @@ its window follow the analytic incoming wave exactly; the structure
 scatters against it. Place it on a face with `from_face('z_min')`, or
 steer with `theta/phi` — for oblique incidence with periodic boundaries,
 the boundary must be `bloch` (see
-[03 · Boundaries](boundaries-and-domain-size.html)).
+[03 · Boundaries](tut3.html)).
 
 The TFSF machinery matters because it keeps the incident field defined
 even where a pure field-injection scheme would fail: the source surface
@@ -271,6 +271,6 @@ power as a bug to find, not a rounding error to wave past.
 
 ## Continue
 
-- Exact parameter tables: [05 · f.src](f-src-sources.html),
-  [06 · f.mon](f-mon-monitors.html)
-- Reading what you measured: [06 · Reading results](reading-results.html)
+- Exact parameter tables: [05 · f.src](05-src.html),
+  [06 · f.mon](06-mon.html)
+- Reading what you measured: [06 · Reading results](tut6.html)
