@@ -253,6 +253,23 @@ def _wait_idle(k: SessionKernel, timeout_s: float = 15.0) -> bool:
     return False
 
 
+def _wait_text(k: SessionKernel, needle: str, timeout_s: float = 15.0) -> str:
+    """等某段文字出现在第 0 号会话的输出里，返回当时的全文。
+
+    为什么不 `_wait_idle` + 立刻读：`busy` 与输出环是两条独立更新的事件，
+    标志先翻、文本后到就会偶发读到"还没有那句错误"（实测全量跑偶发一次、
+    单跑必过）。断言的目标是"错误最终被报出来"，所以等可观测结果。
+    """
+    deadline = time.time() + timeout_s
+    text = ""
+    while time.time() < deadline:
+        text = "".join(l["text"] for l in k.output(0)["lines"])
+        if needle in text:
+            return text
+        time.sleep(0.1)
+    return text
+
+
 def test_stop_idle_is_noop_and_worker_survives():
     """停止锚①：空闲期 stop = False（无事可停），且 SIGINT 地雷已拆——
     即使信号在空闲期到达，worker 也只提示不死亡（会话态保留，后续
@@ -844,13 +861,12 @@ def test_patch_rejects_unknown_verb_and_bad_remove(tmp_path):
     before = k.output(0)["cfg"]
 
     k.patch([{"verb": "insert", "path": "monitor", "value": {}}])
-    assert _wait_idle(k)
-    text = "".join(l["text"] for l in k.output(0)["lines"])
+    text = _wait_text(k, "未知 verb")
     assert "未知 verb" in text, text[-300:]
 
     k.patch([{"verb": "remove", "path": "monitor.7"}])
     assert _wait_idle(k)
-    text = "".join(l["text"] for l in k.output(0)["lines"])
+    text = _wait_text(k, "下标越界")
     assert "下标越界" in text, text[-300:]
     assert (k.output(0)["cfg"] or {}) == before, "两次都该整批拒、模型不动"
 
