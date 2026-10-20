@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genie"
-version = "2.0.0a4"
+version = "2.0.0a5"
 description = "GENIE SDK v2 — 脚本构建仿真、f.run() 提交云端 GPU；preview_script 零网络预览（模型与提交互不相干）"
 readme = "README.md"
 requires-python = ">=3.10"
