@@ -298,7 +298,7 @@ def test_validate_for_ui_expr_error_kind_prefix():
 def test_submit_precheck_uses_same_verdict():
     """提交前预检与 UI 预检同判定：同一份坏配置两边都要拒。"""
     from genie.core.simulate import _validate_for_submit
-    from genie.core.errors import GenieConfigError
+    from genie.models.errors import GenieConfigError
     raw = {**BASE_CFG, "parameters": {"1bad": 1}}
     with pytest.raises(GenieConfigError) as ei:
         _validate_for_submit(raw)

@@ -43,9 +43,9 @@ from __future__ import annotations
 import os
 import sys as _sys
 
+from .models.errors import (GenieConfigError, GenieError, GenieHTTPError,
+                            GenieJobError)
 from .core import material
-from .core.errors import (GenieConfigError, GenieError, GenieHTTPError,
-                          GenieJobError)
 from .core.preview import preview_script
 from .core.results import FreqResult, IndexResult, TimeResult
 from .core.simulate import Simulation
@@ -138,16 +138,19 @@ def connect(base_url: str | None = None, api_key: str | None = None,
 
     认证二选一：``api_key``（直接 token）或 ``username``+``password``
     （先 POST /api/auth/login 换 token，后续请求自动带上）——推荐后者。
-    ``base_url`` / ``api_key`` / ``username`` / ``password`` 缺省读环境
-    变量 ``GENIE_URL`` / ``GENIE_API_KEY`` / ``GENIE_USERNAME`` /
-    ``GENIE_PASSWORD``。返回对象的 ``domain/mesh/mat/geom/src/mon`` 六个
-    子对象与本地包同名同手感。
+    ``base_url`` / ``api_key`` / ``username`` / ``password`` 解析优先级：
+    显式参数 > env（``GENIE_URL`` / ``GENIE_API_KEY`` / ``GENIE_USERNAME``
+    / ``GENIE_PASSWORD``）> ``~/.genie/config.json``（``genie connect``
+    写入）。全都没配 → 报错带下一步动作（``genie connect <地址>``）。
+    返回对象的 ``domain/mesh/mat/geom/src/mon`` 六个子对象与本地包同名
+    同手感。
     """
     from .net import client as _client_mod
+    from .net.config import resolve_credential, resolve_gateway
 
-    url = base_url or os.environ.get("GENIE_URL")
-    key = api_key or os.environ.get("GENIE_API_KEY")
-    user = username or os.environ.get("GENIE_USERNAME")
+    url = resolve_gateway(base_url)
+    key = resolve_credential(api_key, "GENIE_API_KEY", "api_key")
+    user = resolve_credential(username, "GENIE_USERNAME", "username")
     pwd = password or os.environ.get("GENIE_PASSWORD")
     client = _client_mod.Client(url, key, username=user,
                                 timeout=timeout)  # 模块属性寻址——测试可注入假传输

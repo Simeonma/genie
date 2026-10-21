@@ -23,7 +23,7 @@ from typing import Any, Callable
 
 import requests
 
-from ..core.errors import GenieHTTPError, GenieJobError
+from ..models.errors import GenieHTTPError, GenieJobError
 
 TERMINAL_OK = "succeeded"
 # "archived" = 作业已被 janitor 归档（终态，产物在 archive_path 下）。不把它
@@ -214,7 +214,7 @@ class Client:
         r = self._s.post(self.base_url + path, json=body,
                          timeout=self.timeout)
         if r.status_code >= 400:
-            from ..core.errors import GenieHTTPError
+            from ..models.errors import GenieHTTPError
             raise GenieHTTPError(
                 f"专家端点 {path} 失败（{r.status_code}）",
                 status=r.status_code, detail=r.text[:400])

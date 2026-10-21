@@ -27,7 +27,7 @@ import time as _time
 from pathlib import Path
 from typing import Any, Callable
 
-from .errors import GenieHTTPError, GenieJobError
+from ..models.errors import GenieHTTPError, GenieJobError
 
 from ..models import SweepSpec
 from ..models.sweep_expand import validate_sweep_config

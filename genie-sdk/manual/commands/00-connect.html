@@ -330,17 +330,23 @@ SDK Docs</a></div></div>
 <p>Connect to the GENIE service and return a <code>Simulation</code> instance (conventionally named <span class="mathi"><i>f</i></span>) — a live configuration object that is serialized and sent to the cloud only when <code>f.run()</code> submits. Returns: a <code>Simulation</code> whose six sub-objects mirror the local fdtd package: <code>f.domain</code> (<a href="#f-domain-physical-domain-boundaries">Domain</a>), <code>f.mesh</code> (<a href="#f-mesh-grid-local-refinement">Grid</a>), <code>f.mat</code> (<a href="#f-mat-materials-registry">Materials</a>), <code>f.geom</code> (<a href="#f-geom-geometry">Geometry</a>), <code>f.src</code> (<a href="#f-src-sources">Sources</a>), <code>f.mon</code> (<a href="#f-mon-monitors">Monitors</a>).</p>
 <div class="tblwrap"><table>
 <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>base_url</code></td><td>str</td><td>No</td><td>env <code>GENIE_URL</code></td><td>Service address — caddy SDK gate (<code>https://genie.example.com</code>) for remote SDK, <code>http://127.0.0.1:8777</code> for Studio debugging</td></tr>
-<tr><td><code>api_key</code></td><td>str</td><td>No</td><td>env <code>GENIE_API_KEY</code></td><td>Auth key (sent as <code>X-API-Key</code> header)</td></tr>
-<tr><td><code>username</code></td><td>str</td><td>No</td><td>env <code>GENIE_USERNAME</code></td><td>Username (metering attribution)</td></tr>
+<tr><td><code>base_url</code></td><td>str</td><td>No</td><td>see priority below</td><td>Service address — caddy SDK gate (<code>https://genie.example.com</code>) for remote SDK, <code>http://127.0.0.1:8777</code> for Studio debugging</td></tr>
+<tr><td><code>api_key</code></td><td>str</td><td>No</td><td>see priority below</td><td>Auth key (sent as <code>X-API-Key</code> header)</td></tr>
+<tr><td><code>username</code></td><td>str</td><td>No</td><td>see priority below</td><td>Username (metering attribution)</td></tr>
 <tr><td><code>timeout</code></td><td>float</td><td>No</td><td>30.0</td><td>HTTP timeout (s, keyword-only)</td></tr>
 </tbody></table></div>
+<div class="kv"><span class="kv-k">Where values come from</span><span class="kv-v">— priority chain (highest wins):</span></div>
+<pre class="code"><code>explicit argument  &gt;  <span class="fn">env</span> (GENIE_URL / GENIE_API_KEY / GENIE_USERNAME)
+                   &gt;  ~/.genie/config.json  &gt;  built-<span class="kw">in</span> default</code></pre>
+<p>Configure once on a machine with the CLI, then call <code>genie.connect()</code> bare:</p>
+<pre class="code"><code>genie connect https://genie.example.com --username me   <span class="cm"># writes ~/.genie/config.json (0600)</span>
+genie connect                                           <span class="cm"># show current resolution</span></code></pre>
 <pre class="code"><code><span class="kw">import</span> genie
 
-f = genie.<span class="fn">connect</span>()                    <span class="cm"># everything from environment variables</span>
+f = genie.<span class="fn">connect</span>()                    <span class="cm"># everything from env / ~/.genie/config.json</span>
 f = genie.<span class="fn">connect</span>(<span class="str">&quot;https://genie.example.com&quot;</span>, api_key=<span class="str">&quot;…&quot;</span>)</code></pre>
 <div class="kv"><span class="kv-k">Common pitfalls</span><span class="kv-v"></span></div>
-<ul><li>A <code>Simulation</code> can only be submitted once — tweaking an already-<code>run()</code> <span class="mathi"><i>f</i></span> and rerunning silently resends the old configuration; create a fresh <code>connect()</code>.</li><li>Missing both <code>base_url</code> and <code>GENIE_URL</code> errors at the HTTP layer; pass one explicitly.</li><li>Inside a Studio session, <code>genie.connect</code> is taken over by the session (zero-network preview) and connection parameters are ignored — expected behavior.</li></ul>
+<ul><li>A <code>Simulation</code> can only be submitted once — tweaking an already-<code>run()</code> <span class="mathi"><i>f</i></span> and rerunning silently resends the old configuration; create a fresh <code>connect()</code>.</li><li>With nothing configured anywhere, <code>connect()</code> raises <code>GenieConfigError</code> telling you to run <code>genie connect &lt;address&gt;</code> (or set <code>GENIE_URL</code>) — the error is the instruction.</li><li>Inside a Studio session, <code>genie.connect</code> is taken over by the session (zero-network preview) and connection parameters are ignored — expected behavior.</li></ul>
 <div class="kv"><span class="kv-k">See also</span><span class="kv-v"><a href="#f-submit-lifecycle">Simulation state machine &amp; run()</a></span></div>
 <h2 id="genie-preview-script"><a class="anchor" href="#genie-preview-script" aria-label="Link to this section">#</a><code>genie.preview_script()</code></h2>
 <p>Execute a script text with zero network and return the model it builds — the entry point shared by Studio preview and agent tools, entirely independent of real submissions. Returns: a dict with <code>ok</code> (bool), <code>cfg</code> (captured SimConfig JSON; on failure, everything built up to the crash), <code>stdout</code> (captured prints), and <code>error</code> (<code>None</code>, or <code>{kind, message, line, traceback}</code> with the script line number).</p>

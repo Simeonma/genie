@@ -12,7 +12,7 @@ from typing import Any, get_args, get_origin
 from pydantic import BaseModel
 
 from .builder import Domain, Geometry, Materials, Mesh, Monitor, Source
-from .errors import GenieConfigError, GenieJobError
+from ..models.errors import GenieConfigError, GenieJobError
 from ..models import DomainSpec, LorentzMatSpec, MeshSpec, RunSpec, SimConfig
 from .sweep import SweepHandle, build_sweep_spec
 

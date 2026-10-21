@@ -23,8 +23,20 @@ import argparse
 import os
 import secrets
 import socket
+import sys
 import threading
 import webbrowser
+
+# Windows 控制台缺省 GBK/OEM 代码页，打印 ✓/✗ 这类符号会直接
+# UnicodeEncodeError（真机实测踩中：配置写成功了、提示却崩成一屏
+# traceback）。修法是**保留控制台原编码**（中文在 GBK 下原生可显），
+# 只把编码外的字符降级为 ?——不强制 UTF-8，那会把中文打成乱码。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(errors="replace")
+        except (OSError, ValueError):   # 已被重定向的非常规流：尽力而为
+            pass
 
 
 def _port_free(host: str, port: int) -> bool:
@@ -148,6 +160,43 @@ def cmd_console(args: argparse.Namespace) -> int:
             rv.clear()
 
 
+def cmd_connect(args: argparse.Namespace) -> int:
+    """``genie connect``：写/看本机身份配置（G72a 零配置面的入口动作）。"""
+    from genie.net.config import (DEFAULT_GATEWAY, config_path, load_config,
+                                  resolve_gateway, save_config)
+
+    url = (args.url or "").strip().rstrip("/")
+    if not url:
+        # 无 url = 展示当前解析结果（不泄露 key）
+        cfg = load_config()
+        try:
+            gw = resolve_gateway(None)
+            src = ("env GENIE_URL" if os.environ.get("GENIE_URL")
+                   else "config.json" if cfg.get("gateway")
+                   else "内置缺省" if DEFAULT_GATEWAY else "?")
+            print(f"✓ 当前网关：{gw}   （来源：{src}）")
+        except Exception as e:  # noqa: BLE001
+            print(f"✗ {e}")
+        print(f"  配置文件：{config_path()}")
+        user = cfg.get("username")
+        if user:
+            print(f"  已存用户名：{user}")
+        return 0
+    save_config(gateway=url, api_key=args.api_key or None,
+                username=args.username or None)
+    print(f"✓ 已写入 {config_path()}")
+    if args.api_key:
+        print("  api_key 已存（文件权限 0600）")
+    # 轻探活：只告诉你状态，写配置不因网络失败而回滚
+    try:
+        import requests
+        r = requests.get(url + "/api/health", timeout=3)
+        print(f"✓ 探活 {url}/api/health → {r.status_code}")
+    except Exception as e:  # noqa: BLE001
+        print(f"⚠ 探活失败（配置已保存，不影响）：{e}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="genie", description="GENIE——GPU 电磁仿真软件"
@@ -169,6 +218,13 @@ def main(argv: list[str] | None = None) -> int:
     co.add_argument("--session", default="",
                     help="会话 id（缺省读门牌里 GUI 正在用的那个）")
     co.set_defaults(fn=cmd_console)
+    cn = sub.add_parser(
+        "connect", help="写本机网关与凭据配置（一次即可，之后 connect() 无参即通）")
+    cn.add_argument("url", nargs="?", default="",
+                    help="网关地址（https://…）；缺省= 显示当前配置")
+    cn.add_argument("--api-key", default=None, help="API key（也可后补）")
+    cn.add_argument("--username", default=None, help="用户名（password 登录用）")
+    cn.set_defaults(fn=cmd_connect)
     ns = ap.parse_args(argv)
     if ns.cmd is None:                  # 裸敲 genie = studio（一键形态）
         ns.cmd = "studio"

@@ -389,6 +389,14 @@ def main() -> None:
             if not isinstance(cfgs, list) or not cfgs:
                 return
             sess_url = (sess_url or os.environ.get("GENIE_BACKEND") or "")
+            if not sess_url:
+                # 无 env 部署覆盖 → 落到本机身份配置的 gateway（G72a）
+                try:
+                    from ..net.config import load_config
+                    gw = str(load_config().get("gateway") or "").strip()
+                    sess_url = gw.rstrip("/") or ""
+                except Exception:   # noqa: BLE001 —— 配置坏了不拦恢复
+                    sess_url = ""
             for c in cfgs:
                 s = (real_connect(sess_url, "") if sess_url
                      else genie.Simulation(client=None))

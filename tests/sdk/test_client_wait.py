@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from genie.core.errors import GenieJobError
+from genie.models.errors import GenieJobError
 from genie.net import client as C
 
 

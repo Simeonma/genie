@@ -1,4 +1,4 @@
-"""异常类型 — SDK 对外错误契约。
+"""异常类型 — SDK 对外错误契约（住最底层：core 与 net 共用的词汇）。
 
 层级::
 
@@ -6,6 +6,10 @@
     ├─ GenieConfigError         本地配置预检失败（提交边界，genie.models 同双手）
     ├─ GenieHTTPError           请求层失败（4xx/5xx：校验错、key 无效、…）
     └─ GenieJobError            作业终态失败（failed/killed：带日志尾）
+
+分层依据：这些类型被 core（simulate/sweep 抛）与 net（client 抛）同时使用，
+按"依赖只能指向更稳定层"的判据放 models（2026-10-23 自 core/errors 迁入；
+``genie.GenieError`` 等公开别名经根包重导出，用户面不受影响）。
 
 设计要点：服务端（pydantic ValidationError / 资源守卫 GuardError）的
 原始信息**原样保留**在 ``.detail``，消息体只做可读化拼接——用户排查

@@ -264,8 +264,11 @@ def result_series(job_id: str, mon: str, field: str,
 
 # ── 唯一网关出口 ────────────────────────────────────────────────
 def _backend() -> str:
+    """解析链：env（部署覆盖项）> ~/.genie/config.json gateway（G72a）> 本机缺省。"""
+    from .kernel_session import _config_gateway
     return (os.environ.get("GENIE_BACKEND")
             or os.environ.get("GENIE_INTERNAL_BACKEND")
+            or _config_gateway()
             or "http://127.0.0.1:9100").rstrip("/")
 
 

@@ -13,22 +13,36 @@ sub-objects mirror the local fdtd package: `f.domain` ([Domain](#f-domain-physic
 
 | Param | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `base_url` | str | No | env `GENIE_URL` | Service address — caddy SDK gate (`https://genie.example.com`) for remote SDK, `http://127.0.0.1:8777` for Studio debugging |
-| `api_key` | str | No | env `GENIE_API_KEY` | Auth key (sent as `X-API-Key` header) |
-| `username` | str | No | env `GENIE_USERNAME` | Username (metering attribution) |
+| `base_url` | str | No | see priority below | Service address — caddy SDK gate (`https://genie.example.com`) for remote SDK, `http://127.0.0.1:8777` for Studio debugging |
+| `api_key` | str | No | see priority below | Auth key (sent as `X-API-Key` header) |
+| `username` | str | No | see priority below | Username (metering attribution) |
 | `timeout` | float | No | 30.0 | HTTP timeout (s, keyword-only) |
+
+**Where values come from** — priority chain (highest wins):
+
+```text
+explicit argument  >  env (GENIE_URL / GENIE_API_KEY / GENIE_USERNAME)
+                   >  ~/.genie/config.json  >  built-in default
+```
+
+Configure once on a machine with the CLI, then call `genie.connect()` bare:
+
+```bash
+genie connect https://genie.example.com --username me   # writes ~/.genie/config.json (0600)
+genie connect                                           # show current resolution
+```
 
 ```python
 import genie
 
-f = genie.connect()                    # everything from environment variables
+f = genie.connect()                    # everything from env / ~/.genie/config.json
 f = genie.connect("https://genie.example.com", api_key="…")
 ```
 
 **Common pitfalls**
 
 - A `Simulation` can only be submitted once — tweaking an already-`run()` `f` and rerunning silently resends the old configuration; create a fresh `connect()`.
-- Missing both `base_url` and `GENIE_URL` errors at the HTTP layer; pass one explicitly.
+- With nothing configured anywhere, `connect()` raises `GenieConfigError` telling you to run `genie connect <address>` (or set `GENIE_URL`) — the error is the instruction.
 - Inside a Studio session, `genie.connect` is taken over by the session (zero-network preview) and connection parameters are ignored — expected behavior.
 
 **See also** [Simulation state machine & run()](#f-submit-lifecycle)
