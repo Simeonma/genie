@@ -57,7 +57,7 @@ from .integrations.live import publish
 # sys.modules 后属性寻址与语句级 import 皆通（material 实体在 core/）。
 _sys.modules[__name__ + ".material"] = material
 
-__version__ = "2.0.0a6"
+__version__ = "2.0.0a7"
 
 
 def _swap_connect(fn):
