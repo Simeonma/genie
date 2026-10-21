@@ -45,27 +45,28 @@ envelope, its spectrum decays monotonically, so a pulse meant for one
 band does not sneak energy into distant resonances of the structure.
 
 The SDK parameters map as: `freq` = `f₀` (Hz), `bandwidth` = the Gaussian
-bandwidth (Hz). A pulse with bandwidth `bw` resolves spectral features
-coarser than roughly `bw` — and, by time-bandwidth duality, its duration
-is `~1/bw`, so **wide bandwidth = short pulse = short simulation**.
-`delay` shifts `t₀` (useful to let the pulse fully enter before hitting
-the structure), `phase` adds a constant phase. Useful time–bandwidth bookkeeping:
+bandwidth parameter (Hz). One convention to know: `bandwidth` is **not
+itself the spectral FWHM** — it is the historical rate parameter, pinned
+by the kernel as σ_t = 0.5/bw, giving effective widths of
+time-amplitude FWHM ≈ 1.18/bw, time-intensity FWHM ≈ 0.83/bw, and
+spectral-intensity FWHM ≈ 0.53·bw. A pulse with bandwidth `bw` resolves
+spectral features coarser than roughly `bw` — and, by time-bandwidth
+duality, its duration is `~1/bw`, so **wide bandwidth = short pulse =
+short simulation**. `delay` shifts `t₀` (useful to let the pulse fully
+enter before hitting the structure), `phase` adds a constant phase.
 
-```math
-Δt_FWHM = 2√(2 ln2)·σ ,   Δf_FWHM = 2√(2 ln2)/(2πσ) ,   Δt_FWHM · Δf_FWHM = 0.441
-```
+Specifying `bandwidth` fixes the pulse length — a 120 THz bandwidth
+pulse has `σ ≈ 4.2 fs` and an amplitude FWHM of ≈ 9.8 fs, and needs only
+tens of fs of runout; a 1 MHz-wide scan of a high-Q cavity cannot be
+driven by one pulse at all (see `Δf ≈ 1/total_time` below).
 
-so specifying `bandwidth` fixes the pulse length — a 120 THz bandwidth
-pulse is ~3.7 fs FWHM and needs only a few fs of runout; a 1 MHz-wide
-scan of a high-Q cavity cannot be driven by one pulse at all (see `Δf ≈
-1/total_time` below).
-
-**Worked numbers.** For `f₀ = 300 THz` and `bw = 120 THz`: since
-`Δf_FWHM · Δt_FWHM = 0.441`, the pulse duration is
-`Δt_FWHM = 0.441/(120×10¹²) ≈ 3.7 fs`. That is fewer than four optical
+**Worked numbers.** For `f₀ = 300 THz` and `bw = 120 THz`: with
+`σ = 0.5/bw`, the pulse duration is
+`Δt_FWHM ≈ 1.18/(120×10¹²) ≈ 9.8 fs`. That is about three optical
 cycles at 300 THz (one cycle is 1/f₀ ≈ 3.3 fs), so the pulse is close to
 the extreme of what "narrowband carrier plus envelope" language still
-describes, and it covers the band 240–360 THz in a single shot. This is
+describes, and its spectral-intensity FWHM is ≈ 64 THz centered on f₀
+(meaningful content spans roughly `f₀ ± bw/2`). This is
 the right source for broadband transmission through a photonic-crystal
 slab; it is the wrong source for a narrow filter, where 100 THz of
 spectrum is spent on frequencies you will never look at while the filter
