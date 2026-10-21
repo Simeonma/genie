@@ -101,6 +101,31 @@ print(f.digest())            # numeric summary (server-computed, zero-GPU)
 
 See [09 · results](09-results.html) for the full data surface.
 
+## Units and quick conversions
+
+The SDK is SI throughout (meters, Hz, seconds). Wavelength ↔ frequency is
+`f = C0/λ` with `C0 = 299792458 m/s`; vacuum impedance `ETA0 ≈ 376.73 Ω`
+for reference. Quick lookup:
+
+| λ | f = C0/λ |
+|---|---|
+| 500 nm | ≈ 600 THz |
+| 800 nm | ≈ 375 THz |
+| 1310 nm | ≈ 229 THz |
+| 1550 nm | ≈ 193 THz |
+
+Bandwidth conversion for a spectral span centered at λ:
+
+```
+Δf ≈ C0 · Δλ / λ²
+```
+
+Example: `Δλ = 100 nm` at `λ = 1550 nm` →
+`Δf ≈ 3e8 × 100e-9 / (1550e-9)² ≈ 12.5 THz`. Note the `1/λ²` scaling: the
+same `Δλ` at the short-wavelength end (say 500 nm) corresponds to a much
+larger `Δf` (~120 THz for 100 nm) — check `bandwidth`/monitor spans in
+frequency, not just in nanometers.
+
 ## Where to go next
 
 - Parameterize the pitch and scan it: [08 · sweep](08-sweep.html)

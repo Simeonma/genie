@@ -127,7 +127,7 @@ def build_sweep_spec(sweep: dict | None = None,
 
     parameters = list of axis dict（每项 ``{"name": 参数名, "values": …}``
     / ``{"name": …, "linspace": [a, b, n]}`` / ``logspace`` 同理），与
-    dialect.md SweepAxisSpec（name 轴形态）逐字段同形——**不发明新面**，
+    手册 08-sweep 页的 SweepAxisSpec（name 轴形态）逐字段同形——**不发明新面**，
     纯拼装。``name`` 必须是基底配置 ``parameters`` 键集内的参数名
     （本地展开期裁决，SweepExpandError）；``{"path": …}`` 旧形态已退役。
     """

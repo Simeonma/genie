@@ -2133,7 +2133,7 @@ class Scene3D {
     this._srcLabel(src, index, c, radius, col, size);
   }
 
-  /* 注入面几何（plane_wave / gaussian_beam 共用; 语义对齐 dialect.md）：
+  /* 注入面几何（plane_wave / gaussian_beam 共用; 语义对齐手册 05-src 页）：
    * 传播轴 = propagation_axis > from_face > size 恰一非正槽（歧义 z）;
    * 位置 = center（from_face 覆盖为贴该面内侧、横轴中心=域心）;
    * k = theta/phi 实际方向（默认 ±轴）。横向跨度 t[i] = 正槽值或全域。 */

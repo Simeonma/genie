@@ -84,11 +84,11 @@ bandwidth, which is the central lesson of this page.
 
 ## Choosing a source type
 
-| Type | Field injected | Use when |
-|---|---|---|
-| `add_plane_wave` | uniform on a plane (TFSF formalism) | far-field excitation, scattering problems |
-| `add_gaussian_beam` | plane wave × transverse Gaussian envelope | focused / finite beams |
-| `add_soft_source` | local current volume `J(r)` | waveguide feeds, point dipoles, custom injection |
+| Type | Field injected | Use when | Don't use when |
+|---|---|---|---|
+| `add_plane_wave` | uniform on a plane (TFSF formalism) | far-field excitation, scattering problems | the beam-spot shape matters (a plane wave has no spot) |
+| `add_gaussian_beam` | plane wave × transverse Gaussian envelope | focused / finite beams | the aperture radius exceeds the domain's transverse extent (the beam is truncated at the boundary) |
+| `add_soft_source` | local current volume `J(r)` | waveguide feeds, point dipoles, custom injection | measuring transmission directly — a soft source radiates in both directions |
 
 The choice follows from how the real experiment illuminates the
 structure. A solar-cell or metasurface calculation lives in the plane
@@ -115,6 +115,14 @@ practical consequence for you is that a plane wave simulation needs the
 source plane and the monitors to respect the TFSF geometry: monitors
 between source and structure measure incident plus scattered fields and
 are not transmission by themselves.
+
+The one-way behavior is measurable, and the two source families sit at
+opposite ends of it. A soft source observed at equal distances in front
+of and behind its plane shows peak amplitudes differing by 0.00% —
+exactly bidirectional. A plane wave measured the same way shows
+`|Ey| = 0.479` ahead of the source versus `0.0383` behind it, a ~12×
+contrast; the back-side residue is numerical leakage from the TFSF
+surface, not a second beam.
 
 The Gaussian beam's `radius` is the **aperture radius** on the source
 plane: the 1/e² intensity beam width is `w ≈ 0.47·radius`.
@@ -167,6 +175,15 @@ main-lobe width for **−31.5 dB** sidelobes:
 
 Rule: resolve two peaks ⇒ `Δf < |f₁ − f₂|`; kill ringing around a sharp
 resonance ⇒ `apodize('both')` and accept the broadened lineshape.
+
+Trusted-band rule: the trustworthy content of a Gaussian-pulse run is
+`f₀ ± bandwidth/2`; outside that interval the spectrum shows only the
+pulse's roll-off, not physics.
+
+Apodization is worth its cost in numbers: measured on a reference run,
+the in-band spectral-shape deviation drops from 2.41% (unwindowed) to
+1.53% with `apodize`. A `width` set too narrow, however, throws the
+window's own sidebands out of band and forfeits the benefit.
 
 The −13.2 dB number is worth memorizing because it sets the dynamic
 range of any unwindowed spectrum. Sidelobes only 18 dB below the main

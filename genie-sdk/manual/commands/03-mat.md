@@ -9,13 +9,14 @@
 
 ## `f.mat.add_const()`
 
-Registers a constant (non-dispersive) material; eps/mu accept a scalar (isotropic), a 3-element diagonal, or a 3×3 symmetric tensor.
+Registers a constant (non-dispersive) material; eps/mu accept a scalar (isotropic), a 3-element diagonal, or a 3×3 symmetric tensor. Tensor symmetry is enforced with a relative tolerance of 1e-6; beyond it the submit boundary returns 422 "tensor must be symmetric".
 
 | Chain method | Description |
 |---|---|
 | `.name(s)` | Registration name (required; geometries reference by it) |
 | `.eps(v)` | Relative permittivity, dimensionless, > 0 (negative constant ε diverges numerically — use pole/library fits for metals) |
 | `.mu(v)` | Relative permeability, dimensionless, > 0, default 1.0 |
+| `.color(s)` | Display color, `#RRGGBB` or `RRGGBB`, normalized to uppercase `#RRGGBB`; invalid values → 422. Pure display layer — the solver never consumes it. When absent, the frontend derives a stable color by hashing the material name |
 
 ```python
 f.mat.add_const().name('sio2').eps(2.1)                 # iso
@@ -33,8 +34,9 @@ Registers a Drude-Lorentz dispersive material (`eps_inf` + pole list); the kerne
 | `.add_eps_lorentz_pole(omega_0, gamma, delta_eps=1.0, *, alpha=None, beta=None)` | Adds one Lorentz pole; omega_0/gamma in rad/s, omega_0 > 0 |
 | `.add_eps_drude_pole(omega_p, gamma, *, alpha=None, beta=None)` | Adds one Drude pole (the ω₀=0 case); omega_p > 0 |
 | `.add_mu_lorentz_pole(...)` / `.add_mu_drude_pole(...)` | Magnetic poles, same parameters as above |
+| `.color(s)` | Display color, `#RRGGBB` or `RRGGBB`, normalized to uppercase `#RRGGBB`; invalid values → 422. Pure display layer — the solver never consumes it. When absent, the frontend derives a stable color by hashing the material name |
 
-Pole forms (settled 2026-09; 3-element shorthand removed): **iso** — omit `alpha`/`beta` → isotropic on all axes; **rank-1** — `alpha=[x,y,z]` (required) ± `beta` (defaults to alpha) → anisotropic along one direction (auto-normalized, zero vectors rejected). Per-axis independence = stack poles. Gain = negative oscillator strength (`omega_p²<0` / negative Δε) is accepted; `gamma < 0` is rejected (not a gain channel).
+Pole forms (settled 2026-09; 3-element shorthand removed): **iso** — omit `alpha`/`beta` → isotropic on all axes; **rank-1** — `alpha=[x,y,z]` (required) ± `beta` (defaults to alpha) → anisotropic along one direction; vectors are auto-normalized and must have norm > 0. `alpha ≠ beta` gives an **asymmetric coupling** α̂β̂ᵀ; reciprocal media should use `alpha = beta`. Supplying `beta` without `alpha` → 422. Per-axis independence = stack poles. Gain = negative oscillator strength (`omega_p²<0` / negative Δε) is accepted; `gamma < 0` is rejected (not a gain channel).
 
 ```python
 f.mat.add_lorentz().name('au_fit') \
@@ -45,6 +47,7 @@ f.mat.add_lorentz().name('au_fit') \
 
 **Common pitfalls**
 
+- Passing pole frequencies in Hz instead of rad/s — `omega_0`/`omega_p`/`gamma` are angular frequencies (rad/s); a value entered in Hz is silently off by 2π (≈ 6.3×) and is the single most common silent error in pole setup. The table above marks the units, but nothing in the pipeline flags the mistake.
 - Passing a 3-element list to a pole — removed, SDK raises TypeError immediately (use iso scalar or rank-1 alpha/beta); wanting ω₀=0 with a lorentz pole is likewise rejected — Drude is the ω₀=0 case.
 - Fitting hand-written nk data — use `add_from_library` below or `genie.material.fit_nk` (the kernel only consumes poles).
 

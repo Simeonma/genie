@@ -45,6 +45,7 @@ GROUPS = [
         "07-run",
         "08-sweep",
         "09-results",
+        "12-parameters",
     ]),
     ("Advanced", [
         "10-fit-nk",

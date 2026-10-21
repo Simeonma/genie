@@ -244,9 +244,13 @@ rejected. Axis-independent parameters = stack several poles.
 
 You rarely fit poles by hand. `f.mat.add_from_library('Au', …)` loads
 bundled n-k data, fits `ε∞ + poles` on the client (same results as the
-service-side fitter, golden-locked), and registers the lorentz node —
-see [10 · genie.material](10-fit-nk.html) for
-`fit_range`, pole-count trade-offs, and fitting your own data.
+old service-side fitter, golden-locked to relative 1e-9), and registers
+the lorentz node — see [10 · genie.material](10-fit-nk.html) for
+`fit_range`, pole-count trade-offs, and fitting your own data. The
+legacy spelling — a bare `from_library` node in the config — is rejected
+by the kernel; the error message carries three migration pointers
+(library + fit_nk + add_from_library) to route old configs onto the
+client-side fit.
 
 The workflow exists because handbook data arrives as tables of n and k,
 never as poles, and the conversion is a nonlinear least-squares problem

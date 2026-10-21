@@ -154,9 +154,15 @@ You cannot mutate a submitted instance. Either export `f.to_script()`, tweak the
 
 ## Units & expressions
 
+### How do I convert between wavelength and frequency units?
+
+`f = C0/λ`, and a spectral span converts as `Δf ≈ C0·Δλ/λ²` (e.g. 100 nm at
+1550 nm ≈ 12.5 THz; the same Δλ is worth more THz at short wavelengths).
+See the quick conversions table in [Quickstart · Units](quickstart.html).
+
 ### Can I write `"d/4"` instead of a number?
 
-Yes — every numeric slot accepts an expression string evaluated **server-side**, referencing the global parameter table set by `f.parameters()` (repeated calls merge). Use bare parameter names (`'d/4'`, not `'{d}/4'` — braces are a Python set literal and get rejected); unit suffixes like `'50[nm]'` also work. Referencing an undefined parameter is rejected at the submission boundary, not locally. See [07 · Submit](07-run.html) and [00 · Connections](00-connect.html).
+Yes — every numeric slot accepts an expression string evaluated **server-side**, referencing the global parameter table set by `f.parameters()` (repeated calls merge). Use bare parameter names (`'d/4'`, not `'{d}/4'` — braces are a Python set literal and get rejected); unit suffixes like `'50[nm]'` also work. Referencing an undefined parameter is rejected at the submission boundary, not locally. See [07 · Submit](07-run.html), [00 · Connections](00-connect.html), and [12 · Parameters](12-parameters.html).
 
 ```python
 f.parameters({'d': 1e-6, 'gap': 'd / 10'})

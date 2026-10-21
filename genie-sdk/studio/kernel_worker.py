@@ -563,7 +563,7 @@ def main() -> None:
     _orig_sim_run = genie.core.simulate.Simulation.run
     def _sim_run_with_progress(self, *a, **kw):
         if getattr(self, "_job_id", None) is not None:
-            # 一个实例只能提交一次（SDK 契约，dialect.md 已写明）。会话里
+            # 一个实例只能提交一次（SDK 契约，手册 07-run 页已写明）。会话里
             # "再跑一次当前模型"是 run 原语的事（工具栏 Run / POST /api/run /
             # 终端 run_model()）——**不在这里偷偷重建实例**：那会让用户手里
             # 的对象和别名静默失效，也会把"改完没生效"变成无声事故

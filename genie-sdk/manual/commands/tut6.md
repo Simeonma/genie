@@ -33,6 +33,12 @@ list is a file from a different version of the configuration, and the
 fastest diagnosis of "these numbers look old" is comparing the group
 names against the script that claims to have produced them.
 
+Note that the `/tr Ex` layout above is the SDK's grouped view; the
+actual on-disk file uses flat keys (`t@tr.Ex`, `f@tr.freqs`, …).
+The full key protocol — prefixes, shapes, and the flat per-cell index
+format — lives in [09 · results](09-results.html), and that section is
+authoritative when the two accounts differ.
+
 Three read paths, one file:
 
 ```python
@@ -57,7 +63,10 @@ dead end.
 **Time monitor** → `E(tₙ)` at one point/volume: use it to verify the pulse
 passed, measure reflections by arrival time, and confirm ring-down
 completeness (fields should be ~0 at the end; if not, your
-`total_time` was too short).
+`total_time` was too short). One sampling caveat: if the monitor uses
+`.down_sample((t0, t1), stride)`, samples recorded outside that window
+contribute nothing to the frequency-domain results (the solver emits a
+warning) — the DFT sees only the declared window.
 
 The time monitor is the raw sensor and the other two are processed
 forms of it, which is why it remains the arbiter when processed results

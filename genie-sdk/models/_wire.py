@@ -283,7 +283,7 @@ class MeshSpec(_StrictModel):
     dy: Optional[float] = Field(default=None, gt=0)
     dz: Optional[float] = Field(default=None, gt=0)
     refine: list[RefineSpec] = Field(default_factory=list)
-    # 细化上限/每轴最少格数（2026-09 Phase2 ①，dialect.md:87 挂账）：
+    # 细化上限/每轴最少格数（2026-09 Phase2 ①，原 dialect.md:87 挂账）：
     # 守卫镜像本地 Mesh setter（isinstance(int) and >=1），默认同本地
     # 128/10。无量纲，不进资源估算（estimate_cells 只吃 dx/dy/dz/refine）。
     # 注意 max_refinement 查的是实际细化（渐变过渡带可比名义 factor 更细，
@@ -425,7 +425,7 @@ MaterialSpec = Annotated[
 # 全开：+ngon_z/polygon_z（正 n 边形孔阵与任意多边形超表面单元）、
 # +ellipse_z/ring_z/polygon_swept（椭圆孔/孔环/斜切扫掠——提案
 # kernel_patch_proposals/2026-09-geometry-expansion.md，2026-09 落地；
-# 方言与本地 fdtd/api/geometry.py 至此对齐，见 dialect.md 附录 A）
+# 方言与本地 fdtd/api/geometry.py 至此对齐（原 dialect.md 附录 A，已随其退役）
 # ---------------------------------------------------------------------------
 
 

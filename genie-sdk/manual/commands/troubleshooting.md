@@ -124,6 +124,32 @@ Fix: enlarge the domain, extend `total_time` — see
 [reading-results.html](tut6.html) and
 [boundaries-and-domain-size.html](tut3.html).
 
+## Plane-wave transmission spectrum is abnormally low or truncated
+
+Your plane-wave transmission curve collapses (e.g. measured T ≈ 0.14 where
+the structure should pass almost everything) or cuts off across the band.
+
+**Cause: source injected at a face flush against the PML inner edge.** With
+`from_face` injection the pulse starts at the PML inner edge and reaches the
+far-side monitor only after an extra transit `~d/c` (longer at oblique
+incidence, `d/cosθ`). If the apodization stop time was set for the domain
+center, the apodization window closes before the pulse has fully crossed the
+monitor and the DFT flux is chopped.
+Diagnostic: compare your `apodize` stop time against the time the pulse needs
+to reach the *farthest* monitor.
+Fix: set `stop ≥ t0 + d_max/cosθ + 3σ + width/2`, where `σ = 0.5/bandwidth`
+— see [f-src-sources.html](05-src.html) and
+[f-mon-monitors.html](06-mon.html).
+
+**Cause: material fit window too narrow, producing `eps_inf < 1`.** A fitted
+dispersive model can come out with `eps_inf < 1` (observed with Au fitted
+over 500–600 nm); the ill-conditioned dispersion then amplifies fields and
+the run goes NaN within ~1000 steps even though `cfl` is legal.
+Diagnostic: check the fitted `eps_inf` for your `fit_range`; NaN at small
+step counts with legal `cfl` is the signature.
+Fix: widen `fit_range`, lower `cfl`, and do a short-`total_time` trial run —
+see [10 · genie.material](10-fit-nk.html).
+
 ## Fields look unphysical near the edges
 
 Monitor readings decay for no physical reason, dip where the structure should

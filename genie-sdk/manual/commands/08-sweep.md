@@ -1,29 +1,39 @@
 # 08 · sweep (f.sweep & SweepHandle)
 
-> Submission returns a handle and **does not wait**; unlike `run()`, a sweep
-> does not occupy this instance's job_id (the parent job runs on a separate
-> track). All handle methods are HTTP forwarding plus thin local
-> organization — no remote state is cached (every access queries live).
+> `f.sweep(...)` expands the sweep **locally** and returns a `SweepHandle`
+> immediately — no submission, no waiting, at call time. A sweep is a pure
+> client-side composition of ordinary jobs: there is no parent job and no
+> server-side sweep track; each point is submitted as a regular job under
+> the signed-in user. The handle keeps all state local.
 
 ## `f.sweep()`
 
-Starts a parameter sweep across the base configuration and returns a
-`SweepHandle` immediately — use it to scan a parameter axis (or several)
-without blocking. Axis syntax/mutual exclusion/point-count caps/parameter-name
-validation are authoritative on the server (422 passed through); the same
-local precheck runs before submission.
+Expands the SweepSpec against the base configuration at the call site:
+`SweepSpec` validation plus `validate_sweep_config` (axis-name check,
+expansion, per-point re-resolution). An invalid spec raises
+`SweepExpandError` **locally** at the call point (the retired server-side
+422 surface, error messages unchanged). A valid call returns a
+`SweepHandle` with the per-point **resolved** configurations ready to
+submit — nothing has been sent yet.
 
 | Param | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `config` | dict | no | `to_config()` | Base SimConfig JSON; defaults to the current instance's collected configuration |
-| `parameters` | list | no | — | Convenient axis form: `[{"name": "dx", "linspace": [10e-9, 40e-9, 4]}, …]`; `name` must be a parameter name from the base `parameters` table; multiple axes default to `product` |
-| `sweep` | dict | no | — | Fully-controlled SweepSpec dict (few users need this; can express the zip mode); mutually exclusive with `parameters` (if both given, `sweep` wins) |
-| `mode` | str | no | `"product"` | `"product"` / `"zip"` — both axis forms can express either |
+| `sweep` | dict | no | — | Fully-controlled SweepSpec dict; mutually exclusive with `parameters` (both given → `ValueError`) |
+| `parameters` | list | no | — | Convenient axis form: `[{"name": "dx", "linspace": [10e-9, 40e-9, 4]}, …]`; each axis is `{"name": …}` plus exactly one of `values` / `linspace` / `logspace` (mutually exclusive, violating → `ValueError`); `name` must be a key of the base `parameters` table |
+| `mode` | str | no | `"product"` | `"product"` (Cartesian, axis order = outermost loop first) / `"zip"` (axes paired element-wise, equal lengths required) |
 | `gpus_per_sim` | int | no | 1 | GPUs per point (1–8) |
-| `max_parallel` | int | no | 1 | Cap on points running in parallel (1–16) |
-| `on_failure` | str | no | `"continue"` | `"continue"` / `"abort"` |
+| `max_parallel` | int | no | 1 | Local cap on points in flight (1–16) |
+| `on_failure` | str | no | `"continue"` | `"continue"` (failed points become NaN rows, the rest run) / `"abort"` (first failure cancels the remainder) |
 
-**Example**
+**Local expansion constraints** (`SweepExpandError` at the `f.sweep()`
+call point): at most 32 axes; at most 512 expanded points by default
+(over-limit rejected with the count and the cap; deploy-configurable via
+the `FDTD_MAX_SWEEP_POINTS` environment variable); `zip` axes of equal
+length; every axis `name` must exist in the base `parameters` key set
+(else the error lists the available names). `linspace`/`logspace` take
+`[start, stop, n]` with `n ≥ 2` and `start != stop`; `logspace`
+interprets the bounds as exponents of 10.
 
 ```python
 f.parameters({'pitch': 180e-9})
@@ -34,31 +44,83 @@ h = f.sweep(parameters=[
 h.wait(progress=True)
 ```
 
+### Submission semantics (sliding window)
+
+Points are submitted as ordinary jobs, one per point, through a sliding
+window: at most `min(max_parallel, quota.max_concurrent_runs)` jobs are
+kept in flight, and each finished point frees a slot for the next
+pending one. The quota is read from the gateway `/whoami` response
+(fallback window of 2 when the quota is unavailable). The window is a
+politeness measure only — the server-side gates (429 / admission)
+remain authoritative.
+
 ## SweepHandle
 
-| Read-only | Returns | Description |
+Handle-side state machine (state names shared with the retired
+server-side parent states):
+`pending → running → done | canceled | failed` — `failed` only when
+**every** point ended bad (failed/killed/canceled); any success →
+`done`.
+
+| Attribute | Type | Description |
 |---|---|---|
-| `h.id` | str | Parent job sweep_id |
-| `h.status()` | dict | Parent record + rollup + per-point summaries |
-| `h.state` | str | Parent state: `queued/running/done/failed/canceled` |
-| `h.rollup` | dict | Per-point counts `{succeeded, failed, canceled, …}` |
-| `h.points()` | list | `[{idx, state, job_id}]` per-point summaries |
-| `h.manifest()` | dict | Full manifest (axis summary + per-point md5) |
+| `h.id` | str | Local sweep id `"sw-" + random`; no parent job exists on the server |
+| `h.state` | str | Handle state: `pending` / `running` / `done` / `canceled` / `failed` |
+| `h.points` | list[dict] | Per-point **resolved configurations** (what each child job was or will be submitted with) |
+| `h.axis_names` | list[str] | Axis parameter names, in spec order |
+| `h.job_ids` | list[str \| None] | Per-point child job ids; `None` until submitted |
+| `h.states` | list[str] | Per-point states (`pending` / `queued` / `running` / `succeeded` / `failed` / `killed` / `canceled`) — snapshot as of the last refresh |
 
 | Method | Description |
 |---|---|
-| `wait(timeout=None, poll=2.0, progress=None)` | Poll to a terminal state; `done` → returns the final status dict (incl. rollup), `failed`/`canceled` → raises `GenieJobError`. `timeout` is a local wait cap — on expiry GenieHTTPError is raised but **the job keeps running on the server**; re-enter `wait()` with no arguments to resume. `progress=True` for a one-line rollup progress |
-| `cancel()` | Cascading cancel: parent lands on canceled, running/queued children reaped, unstarted points marked canceled. Already-terminal parent → HTTP 409 passed through |
-| `child_id(idx, manifest=None)` | 0-based point index → child job id (manifest's job_id takes precedence; derived as `{sweep_id}-pNNNN`, 1-based, 4 digits, if absent) |
-| `result(idx)` | That point's child-job result bytes (point not succeeded → 409 passed through) |
-| `aggregate()` | Server-side aggregation table `aggregate.npz` bytes: parameter columns + per-point digest numeric-summary columns (not yet generated → 404) |
-| `download(dir)` | Lands the whole set into `dir` (`manifest.json`, best-effort `aggregate.npz`, `pNNNN/result.npz`, `pNNNN/summary.json`); only `succeeded` points, existing files skipped (resumable). Returns the directory Path |
+| `wait(timeout=None, poll=2.0, progress=None)` | Drive the orchestration (one `pump()` per `poll` seconds) to a terminal state and return the final status dict. `done` → returned; `failed`/`canceled` → raises `GenieJobError` carrying the rollup. `timeout` expiry → `GenieHTTPError` (408); nothing is killed — re-enter `wait()` with no arguments to resume the same handle. `progress=True` prints a one-line rollup per step; a callable receives `progress(status)` |
+| `pump()` | Advance one step locally: fill the submission window, refresh in-flight states, rule on abort/cancel, judge terminal state |
+| `status()` | Pure local assembly `{sweep_id, state, rollup, points: [{idx, state, job_id}]}` — **no network call**; in-flight states are the snapshot from the last refresh (call `wait`/`pump` first for fresh data) |
+| `rollup()` | Local count dict over per-point states (`{"succeeded": 3, "running": 1, …}`) |
+| `cancel()` | Idempotent (no 409 path): in-flight child jobs are cancelled one by one, remaining points marked `canceled` |
+| `digests()` | Per-point `GET /api/jobs/{id}/digest`; failed / canceled / not-yet-run points → `None` (NaN rows downstream) |
+| `aggregate()` | **Local** aggregation as a plain column dict (see below) — not npz bytes, not an HTTP fetch; never 404/410 |
+| `download(dir)` | Lands exactly two files into `dir`: `manifest.json` (verbatim `status()` output) and `aggregate.npz`. No `pNNNN/` per-point directories — each point is an ordinary job; per-point full results are fetched through the ordinary results surface after `genie.connect()` |
+
+`on_failure="abort"` semantics: the first point seen `failed` (with no
+point yet `succeeded`) triggers automatic cancellation of the remaining
+points.
+
+### Aggregate column contract
+
+`aggregate()` / `download(dir)` build the table locally from the
+per-point digests; the column names are a consumed contract
+(downstream plotting depends on them verbatim):
+
+- Axis columns `param_<name>` — one per axis, taken from each point's
+  resolved `parameters`; name collisions resolved deterministically by
+  appending `_2`, `_3`, ….
+- Result columns `pt_<flattened digest key>` — the union of numeric
+  leaves across all points' digests; nested dicts join with `.` and
+  lists by index, e.g. `pt_monitors.0.comps.Ex.abs_max`. Boolean leaves
+  are skipped.
+- Missing keys and failed/canceled points fill with `NaN`.
+- Metadata columns: `_axes` (JSON mapping column → axis name) and
+  `_skipped_keys` (JSON list of non-numeric skipped keys).
 
 **Common pitfalls**
 
-- Taking the `f` after `f.run()`, tweaking parameters, and sweeping — the
-  `config` default pulls `to_config()`, i.e. the **current** configuration,
-  which is locked after a run; don't run before sweeping.
+- Expecting `status()` to hit the network — it is a pure local
+  assembly over the last-refresh snapshot; call `wait()` / `pump()`
+  first when fresh in-flight states are needed.
+- Calling old-surface methods — `manifest()`, `.result(idx)`,
+  `child_id(idx)` and per-point `pNNNN/` downloads do not exist on the
+  current handle; per-point results come from the child jobs (ordinary
+  jobs) through the ordinary results surface.
+- Giving both `sweep` and `parameters` — a hard `ValueError`; the two
+  forms are strictly exclusive.
+- Taking the `f` after `f.run()`, tweaking parameters, and sweeping —
+  the `config` default pulls `to_config()`, i.e. the **current**
+  configuration, which is locked after a run; don't run before
+  sweeping.
 - Assuming one failed point means total failure — under
-  `on_failure="continue"` (default) the remaining points run anyway; check
-  the `rollup` breakdown.
+  `on_failure="continue"` (default) the remaining points run anyway;
+  check the `rollup` breakdown.
+- Treating the parallel window as a guarantee — the sliding window only
+  limits how many jobs the client keeps in flight; server-side
+  admission and 429 throttling remain authoritative.

@@ -339,7 +339,7 @@ class Simulation:
           参数名）。轴语法/互斥/点数上限/名在参数表
           内的权威在服务端（422 透传）。
         - ``gpus_per_sim`` / ``max_parallel`` / ``on_failure`` / ``mode``
-          同 SweepSpec 字段（dialect.md sweep 节）；``mode`` 缺省
+          同 SweepSpec 字段（手册 08-sweep 页）；``mode`` 缺省
           ``product``，**两种形态都能表达 ``zip``**（C3-b 前便利形态发不出
           ``mode`` ⇒ zip 扫描只能改写 ``sweep=`` 全字典）。
 

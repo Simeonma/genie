@@ -35,7 +35,7 @@ demand). Returns the `Simulation` itself (`state == "done"`), ready for
 
 | Param | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `gpu` | int | no | — | Number of GPUs (1..4); `None`/omitted = single GPU. Device selection, NV-link pairing and axis splitting are scheduled server-side |
+| `gpu` | int | no | — | Number of GPUs (1..4, capped server-side by the `max_gpu_per_run` quota); `None`/omitted = single GPU. Device selection, NV-link pairing and axis splitting are scheduled server-side |
 | `timeout_s` | int | no | 3600 | Server-side job timeout (s) |
 | `poll_interval` | float | no | 2.0 | Polling interval (s) |
 | `progress` | callable | no | — | Per-poll callback `progress(status_dict)` |
@@ -45,6 +45,14 @@ required) — `run()` takes **no step argument**; the job advances until the
 grid's time capacity is reached, and the step count is a read-only derived
 value (`dt`/`n_steps` in `summary`/`results`).
 
+### GPU scheduling semantics
+
+Scheduling server-side consists of a free-memory filter over available
+devices followed by NV-link chain selection. When free GPU memory is
+insufficient, or no complete NV-link chain can be assembled, the job
+lands in **FAILED** with an explicit error — there is no silent
+degradation to fewer GPUs.
+
 ```python
 f.run()                                       # most common
 f.run(gpu=2, progress=print)                  # dual GPU + progress callback
@@ -52,9 +60,9 @@ f.run(gpu=2, progress=print)                  # dual GPU + progress callback
 
 **Common pitfalls**
 
-- Passing `gpu/timeout_s` after submission → RuntimeError (the configuration is already sent); each instance submits at most once — to change the configuration, create a new `genie.connect()`.
+- Passing `gpu/timeout_s` after submission → RuntimeError (the configuration is already sent); each instance submits at most once — to change the configuration, create a new `genie.connect()`. At submission the serialized configuration is frozen verbatim into the job's `payload.json`; there is no parameter-update-and-resume interface.
 - Omitting `domain.total_time` → rejected before submission (it is the only definition of simulation length).
-- Job failure/kill → raises `GenieJobError` (`.state` lands on `failed`/`killed`).
+- Job failure/kill → raises `GenieJobError` (`.state` lands on `failed`/`killed`). Besides `done`/`failed`/`killed`, historical jobs may report the terminal state `archived` (server-side archival of past jobs; the client's `TERMINAL_BAD` set includes it). Results exist only for successful terminal states: querying the results endpoint of a `failed`/`killed` job returns HTTP 409.
 
 ## `f.cancel()`
 
@@ -68,13 +76,23 @@ types/run section/state/job_id, plus the server-side job summary if
 submitted). Prints and returns the dict (`-> dict`); use it to self-check
 completeness before submission.
 
+The returned dict carries the keys `{domain, mesh, n_materials,
+n_geometry, n_source, monitors, run, state, job_id}`. When the instance
+has been submitted, a `server_summary` block is attached containing
+(among others) `grid_shape` — the grid **including absorbing layers** —
+plus `dt` and `n_steps`. The reported `dt` can be cross-checked against
+the Courant bound, `dt ≈ cfl · dx / (C0 · √3)`; measured values agree
+with this relation to within 0.1%.
+
 ## `f.digest()`
 
 Numeric result summary, computed server-side with zero GPU reads (`job_id:
 str | None = None -> dict`, defaulting to this instance's most recent
 submission): peak frequency/amplitude per monitor; plane monitors
 additionally carry transmittance min/max/center-frequency values (the
-physical T only when `normalized=true`). For comparisons and tuning rounds,
+physical T only when `normalized=true`). The dict always contains a
+`source_energies` key — an empty object when the configuration declares
+no named sources. For comparisons and tuning rounds,
 read this instead of downloading result files. Unsubmitted instance and no
 `job_id` → RuntimeError.
 

@@ -30,12 +30,18 @@ The per-face granularity is a feature, not a bookkeeping burden. A device
 that is translationally invariant along one axis needs `periodic` (or
 `bloch`) on that pair of faces and absorption elsewhere; a waveguide
 simulation wants PML on the propagation faces and metal or periodic on the
-sides; a symmetric structure under symmetric excitation can replace half a
-box with a metal or PMC symmetry plane and halve the cost. Reading the
-boundary list is therefore reading a compact statement of the symmetry and
-radiation geometry of the problem. If you cannot say in one sentence what
-the exterior world looks like on each of the six faces, the simulation is
-not yet specified.
+sides. A symmetric structure under symmetric excitation admits a symmetry
+plane: replacing half the box with a `pmc` (or `pec`, for the odd
+counterpart) symmetry plane and simulating the half domain halves the
+computation — an explicit selection rule, not a convenience: whenever the
+structure and the excitation share a mirror symmetry, `pmc`/`pec` on the
+symmetry plane is the correct boundary and the half-domain simulation is
+the cheaper equivalent of the full one. `pec` and `pmc` are the only kinds
+with no same-axis pairing requirement; a single symmetry face is a valid
+configuration. Reading the boundary list is therefore reading a compact
+statement of the symmetry and radiation geometry of the problem. If you
+cannot say in one sentence what the exterior world looks like on each of
+the six faces, the simulation is not yet specified.
 
 ## PML — the absorbing boundary
 
@@ -108,7 +114,10 @@ stretch.
 
 The three knobs in the SDK map directly: `layers` = layer thickness `L`
 (default 12), `kappa_max` = peak real stretch `κ` (default 1.0), `order` =
-polynomial order of the σ ramp (default 3). Increase `layers` for
+polynomial order of the σ ramp (default 3). Layer-count practice: 12–16
+layers for accuracy runs, 8 layers for quick iterations; the parameter
+constraint `layers ≥ 2` is enforced by the parameter table and is a
+validity floor, not a recommendation. Increase `layers` for
 grazing-incidence or highly evanescent fields.
 
 ## Periodic and Bloch boundaries
@@ -135,6 +144,13 @@ the plane wave you already placed. For a plane wave of vacuum wavelength
 |k| = 2π·n/λ₀ ,    k_x = |k|·sinθ ,    a·k_x = 2π · (a/λ) · sinθ
 ```
 
+**The `k` protocol.** The Bloch wave vector is passed as the full vector
+`k = [kx, ky, kz]` in rad/m, the same vector on both faces of the axis,
+and each face uses only its own axis component. `k = [0, 0, 0]` makes
+`bloch` degenerate to `periodic` face by face — a usable sanity check
+that a `bloch` setup reproduces the `periodic` result at zero phase
+advance.
+
 The period enters only as the phase advance per cell — a Bloch sweep
 is a scan of `a·k_x`, which is why oblique periodic simulations with a
 `periodic` boundary instead silently compute normal-incidence physics. Using `periodic` where Bloch is needed
@@ -155,6 +171,22 @@ definition. One worked value: the Quickstart source at `f = 330 THz`
 vacuum carries `a·k_x = 2π·(0.18/0.91)·0.5 = 0.62 rad` of phase advance
 per cell; that number, not the angle, is the physical input, and it is
 what a Bloch sweep of angle actually varies.
+
+**`from_source` precedence.** When `from_source=True` is passed together
+with an explicit `k`, `from_source` takes precedence unconditionally and
+`k` is silently ignored (ruling A1, 2026-09-07; the kernel `calibrate`
+logic — "psi=90 gives e_hat=-x̂" — is of the same family: source-derived
+quantities override the supplied value). `from_source=True` requires a
+plane-wave or Gaussian-beam source to exist; otherwise the job fails.
+
+**Oblique incidence, complete recipe.** Fix the angle `θ` on the source;
+set transverse `bloch` faces with `k` equal to the transverse wave vector
+at the center frequency (`k_x = |k(f₀)|·sinθ`, with `|k| = n·2πf₀/c`);
+set `pml` on the propagation (longitudinal) faces. The Bloch phase is
+exact only at `f₀`; over a broadband run the off-center frequencies carry
+the wrong phase advance and accuracy degrades as the bandwidth widens.
+The shortcut is `from_source=True`, which reads the transverse wave
+vector off the source definition.
 
 ## Sizing the box
 

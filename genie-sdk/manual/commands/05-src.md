@@ -12,7 +12,7 @@
 |---|---|
 | `.freq(f0)` | Center frequency, Hz, > 0, required |
 | `.bandwidth(bw)` | Gaussian envelope bandwidth, Hz, > 0, required |
-| `.delay(t)` | Delay, s, default 0 — the automatic default is usually fine; only tune it when observing early transients |
+| `.delay(t)` | Delay, s, default 0 — the automatic default is usually fine; only tune it when observing early transients. Negative values are legal (an "early pulse"; the wire imposes no lower bound) |
 | `.phase(p)` | Initial phase, rad, default 0 |
 | `.name(s)` | Optional name, for traceability |
 
@@ -39,9 +39,9 @@ Plane wave with TFSF (total-field/scattered-field) injection — place scatterer
 
 | Chain method | Description |
 |---|---|
-| `.from_face(face)` | One of the six faces (`x_min`…`z_max`): plane snaps to the inner side of that face, normal incidence. Most common |
+| `.from_face(face)` | One of the six faces (`x_min`…`z_max`), i.e. always an `_min` face plus a `direction`: pins the propagation axis, places the injection plane ~2.5 grid cells inside the PML inner edge of that face, and centers the transverse axes on the domain. **Overrides** any previously set `center` and propagation axis/direction; `size` and angles still combine with it. Most common |
 | `.direction('+')` / `'-')` | Along the positive/negative direction of the propagation axis (with from_face/propagation_axis) |
-| `.theta(deg)` / `.phi(deg)` / `.psi(deg)` | Polar 0–180 (0 = +z) / azimuthal 0–360 / polarization rotation 0–360 |
+| `.theta(deg)` / `.phi(deg)` / `.psi(deg)` | Polar θ ∈ [0, 180] (closed interval; 0 = +z) / azimuthal φ ∈ [0, 360) / polarization rotation ψ ∈ [0, 360), where ψ = 0 is s polarization (along e_h) and ψ = 90° is p polarization (along e_v). Out-of-range angles are rejected (HTTP 422) — they do not wrap around |
 | `.amplitude(a)` | Amplitude, default 1.0 |
 | `.size(x, y, z)` | Global transverse window: ≤0/null for the propagation-axis slot, positive for the two transverse slots |
 | `.propagation_axis('x'/'y'/'z')` | Explicit propagation axis (default z, exactly one non-positive slot) |
@@ -56,6 +56,7 @@ f.src.add_plane_wave().freq(300e12).bandwidth(60e12) \
 - Oblique incidence + `periodic` boundary — you must use `bloch` (see [Domain & boundaries](#f-domain-physical-domain-boundaries)); also match the `size` transverse window to the bloch boundary.
 - Fine-tuning `theta`/`phi` together with `from_face` — from_face is syntax sugar for normal incidence; for oblique incidence set `theta` first.
 - Placing monitors near the TFSF source plane — readings mix incident + scattered fields; keep monitors a few cells away.
+- Default plane-wave polarization is along **Ey** (kernel `_tfsf.py` `_wave_vectors`: φ = 0 gives e_h = v̂, so +z propagation polarizes along ŷ). A time monitor reading `field('Ex')` as identically zero reflects the polarization, not a failed injection.
 
 ## `f.src.add_gaussian_beam()`
 

@@ -127,7 +127,7 @@ TOOLS: list[dict[str, Any]] = [
             "给 section 只取一节（materials / geometry / source / monitor / "
             "domain / mesh / run），大模型别整份拉。"
             "返回 {ok, has_model, model, busy, phase, job_id, session_id}。"
-            "字段语义见 genie 方言手册（dialect.md）。"),
+            "字段语义见随包手册（manual/commands/ 参考页）。"),
         "parameters": {
             "type": "object",
             "properties": {

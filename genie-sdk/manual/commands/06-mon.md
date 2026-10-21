@@ -11,8 +11,17 @@
 |---|---|---|---|
 | `.name(s)` | yes | — | Results are grouped by it in the result file |
 | `.center(x, y, z)` | no | origin | Center (m) |
-| `.size(x, y, z)` | no | type-specific | Extents (m); a `None` slot = full extent on that axis. time/freq default to a `(0,0,0)` point monitor, index defaults to full extent on all three |
-| `.field(f)` | yes | — | Field selection; valid set per subsection below (dialect-required: no silent default) |
+| `.size(x, y, z)` | no | type-specific | Extents (m); a `None` slot = full extent on that axis, a value ≤ 0 = a single cell on that axis. time/freq default to a `(0,0,0)` point monitor, index defaults to full extent on all three |
+| `.field(f)` | yes | — | Field selection; valid set per subsection below (no silent default; an illegal name is rejected with 422 at validation time) |
+
+## Naming rules
+
+Within one monitor type, duplicate names are rejected with 422 during
+validation (`SimConfig._check` in `genie-sdk/models/_wire.py` deduplicates
+same-type monitors only). The same name across different monitor types is
+legal — cross-type collisions are not checked. (For comparison: duplicate
+material names are not rejected; the later entry simply overwrites the
+earlier one.)
 
 ## `f.mon.add_time()`
 
@@ -22,6 +31,9 @@ waveforms and time-domain reflection. Fields: `Ex Ey Ez Hx Hy Hz all`.
 ```python
 f.mon.add_time().name('pt').center(0, 0, 500e-9).field('Ez')
 ```
+
+Output shape: a point monitor records `time=(n_t,)` — one value per logged
+time step.
 
 ## `f.mon.add_freq()`
 
@@ -35,7 +47,9 @@ and point count (int, ≥ 1).
 Optional refinements: `.down_sample((t0, t1), stride)` (time window +
 decimation) and `.apodize(side, (t0, t1), width)` (window tapering,
 `side ∈ start/stop/both`) suppress spectral artifacts from time-domain
-truncation and reduce recorded volume.
+truncation and reduce recorded volume. Output shape: freq keeps the trailing
+axis — a line/plane monitor yields `freq=(n_f, 1)`-shaped arrays per
+frequency point.
 
 ```python
 f.mon.add_freq().name('tr') \
@@ -46,6 +60,7 @@ f.mon.add_freq().name('tr') \
 **Common pitfalls**
 
 - `.freq()` must be the `(center, bw, n)` triple — a single value or list is rejected.
+- `.down_sample((t0, t1), stride)` requires `start < stop` — a reversed window is not an error; it silently samples 0 points with no warning. `stride` must be an int ≥ 1; a float raises `TypeError` directly. Typical uses: skipping late-arriving echoes, or decimating to stay under resource limits.
 - Don't place a plane monitor inside the PML — fields in an absorbing layer have no physical meaning.
 - Physical transmittance T requires a plane monitor plus server-side normalization: `digest` reports physical T only when `normalized=true`; point monitors have no area integral and carry no T.
 
@@ -61,6 +76,12 @@ f.mon.add_index().name('ix').field('both')   # full domain
 **Common pitfalls**
 
 - Wanting field maps but using index — it only gives material distributions; use time/freq for fields.
+
+## Result keys
+
+In the result file, monitor outputs are stored under flat keys of the form
+`t@<name>.*` (per quantity); the full flat-key protocol is specified once in
+[09 · Results](09-results.md).
 
 ## `f.mon.clear()`
 

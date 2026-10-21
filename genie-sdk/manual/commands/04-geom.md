@@ -16,6 +16,9 @@
 | `.center(x, y, z)` | Center in m, defaults to origin — all shapes except `box` (which uses x/y/z_range) |
 | `.priority(n)` | Integer, larger wins, default 0 |
 | `.height(h)` | Extrusion thickness along z, m, > 0 — prism/ring/ellipse/polygon shapes (polygon shapes may use `.z_range(lo, hi)` instead) |
+| `.name(s)` | Optional display name; shown in the GUI left tree and 3D labels. Omitted → falls back to the type name (`"Box"`, `"N-gon"`, …). Duplicate names are accepted (no uniqueness constraint; two entries sharing a name remain two rows) |
+
+A structure extending beyond the physical domain is **warned about, not rejected** — a partially outside structure may be intentional. This aligns with the pitfall noted in [Tutorial 6](tut6.html) and [Troubleshooting](troubleshooting.html): a shape that silently falls outside the domain disappears entirely from the built geometry.
 
 ## `f.geom.add_box()`
 
@@ -67,11 +70,11 @@ Ellipse (cylinder variant) extruded along z; `.rx(a)` / `.ry(b)` semi-axes, m, >
 
 ## `f.geom.add_ring_z()`
 
-Ring or solid disk extruded along z; `.inner_radius(r)` ≥ 0 (**0 = solid disk**), `.outer_radius(R)` > 0, both required. Example: `add_ring_z().material('sio2').inner_radius(100e-9).outer_radius(300e-9).height(220e-9)`.
+Ring or solid disk extruded along z; `.inner_radius(r)` ≥ 0 (**0 = solid disk**), `.outer_radius(R)` > 0, both required. `inner_radius ≥ outer_radius` is rejected at schema time (a reverse ring would rasterize silently into an empty mask with no warning). Example: `add_ring_z().material('sio2').inner_radius(100e-9).outer_radius(300e-9).height(220e-9)`.
 
 ## `f.geom.add_polygon_swept()`
 
-Obliquely swept polygon: a base polygon + a lateral offset while sweeping along z (for ramps/tilted walls). Chain = all of polygon_z (same `vertices` sentinel semantics) + `.tilt(dx_dz, dy_dz)` — dimensionless slopes, two args.
+Obliquely swept polygon: a base polygon + a lateral offset while sweeping along z (for ramps/tilted walls). Chain = all of polygon_z (same `vertices` sentinel semantics) + `.tilt(dx_dz, dy_dz)` — dimensionless slopes, two args; optional (omitted = no oblique sweep). Each component must be finite with |v| ≤ 1000; larger tilts push the cross-section outside the domain and are rejected at schema time.
 
 ```python
 f.geom.add_polygon_swept().material('sio2') \
