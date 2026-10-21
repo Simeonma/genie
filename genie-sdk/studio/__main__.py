@@ -9,7 +9,7 @@
 （缺省 127.0.0.1:8123）取；没有会话服务时界面能开但所有执行类接口会报
 "会话服务不可达"（诚实的失败，不是假装能跑）。
 
-需要 server extra（fastapi/uvicorn）：``pip install "genie[server]"``。
+需要 server extra（fastapi/uvicorn）：``pip install "genie-sdk[server]"``。
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ def main() -> None:
         import uvicorn
     except ImportError:  # pragma: no cover —— 指路不裸栈
         sys.exit("缺 uvicorn——本地 Studio 需要 server extra："
-                 'pip install "genie[server]"')
+                 'pip install "genie-sdk[server]"')
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
     uvicorn.run("genie.studio.server:app", host="127.0.0.1", port=port)
 

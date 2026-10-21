@@ -4,6 +4,26 @@
 > from `connect()` to a plot, in about 30 lines. Every step links to the
 > full reference.
 
+## Install
+
+```bash
+# GitHub direct (if raw.githubusercontent.com is reachable)
+pip install https://github.com/Simeonma/genie-sdk/raw/dist/dist/genie_sdk-<version>-py3-none-any.whl
+
+# CDN mirror (recommended on CN networks): same wheel via jsDelivr
+pip install https://cdn.jsdelivr.net/gh/Simeonma/genie-sdk@dist/dist/genie_sdk-<version>-py3-none-any.whl
+```
+
+Distribution name `genie-sdk`; import name `genie` (`import genie`).
+
+Version list: [Releases](https://github.com/Simeonma/genie-sdk/releases)
+(wheels also on the `dist` branch). Python ≥ 3.10;
+`requests / numpy / pydantic / h5py` install automatically.
+
+Optional extras: `genie[server]` local GUI (`genie studio`) ·
+`genie[agent]` MCP tool surface · `genie[fit]` material fitting (scipy) ·
+`genie[plot]` `SimData.plot` (matplotlib) · `genie[dev]` pytest.
+
 ## The whole script
 
 This is a real, runnable simulation — a 10-period dielectric grating with a

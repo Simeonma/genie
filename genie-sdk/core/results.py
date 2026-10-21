@@ -233,7 +233,7 @@ class SimData:
     def plot(self, mon: str, field: str, ax=None):
         """画监视器某场。体监视器（axis × cells 二维）缺省画**峰值格点**
         的曲线（峰值格点号入图例，ASCII 标签避免字体缺字形）；matplotlib 为可选依赖
-        （pip install genie[plot]）。返回 Axes。"""
+        （pip install genie-sdk[plot]）。返回 Axes。"""
         import matplotlib.pyplot as plt  # 可选依赖，import 才触发
 
         ds = self._f[mon][field]

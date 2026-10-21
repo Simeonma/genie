@@ -51,7 +51,7 @@ def _start_local_session() -> tuple[object, str, str]:
     try:
         from genie.studio.session_service import serve
     except ImportError:  # pragma: no cover —— 指路不裸栈
-        raise SystemExit('缺 server extra：pip install "genie[server]"')
+        raise SystemExit('缺 server extra：pip install "genie-sdk[server]"')
     token = secrets.token_urlsafe(24)
     try:
         server, port = serve(0, token=token)
@@ -64,7 +64,7 @@ def cmd_studio(args: argparse.Namespace) -> int:
     try:
         import uvicorn
     except ImportError:  # pragma: no cover —— 指路不裸栈（同下方 session_service）
-        raise SystemExit('缺 server extra：pip install "genie[server]"')
+        raise SystemExit('缺 server extra：pip install "genie-sdk[server]"')
 
     from genie.studio import rendezvous as rv
     from genie.studio import session_service as ss

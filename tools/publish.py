@@ -234,7 +234,7 @@ def step6_release(whl: Path, ver: str) -> None:
         "# CDN 镜像（国内网络推荐：raw.githubusercontent 常不可达）\n"
         f"pip install https://cdn.jsdelivr.net/gh/{slug}@dist/dist/{whl.name}\n"
         "```\n\n"
-        f"源码：本仓 main（Apache-2.0）。wheel 亦在 `dist` 分支。"
+        f"源码：本仓 main。wheel 亦在 `dist` 分支。"
     )
     cmd = ["gh", "release", "create", tag, "--repo", slug,
            "--title", f"genie SDK {ver}", "--notes", body]

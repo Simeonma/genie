@@ -29,7 +29,7 @@ v2 的两个工具（``current_script`` / ``publish_script``）已退役：脚�
 
 用法::
 
-    pip install "genie[agent]"          # mcp>=2.0
+    pip install "genie-sdk[agent]"          # mcp>=2.0
     genie-mcp                            # stdio 服务器（MCP 客户端拉起）
 """
 from __future__ import annotations
@@ -415,7 +415,7 @@ def build_server():
             from mcp.server.fastmcp import FastMCP
         except ImportError as e:  # pragma: no cover —— 依赖缺失路径
             raise RuntimeError(
-                'MCP 服务器需要 mcp 包：pip install "genie[agent]"') from e
+                'MCP 服务器需要 mcp 包：pip install "genie-sdk[agent]"') from e
 
     srv = FastMCP(name="genie",
                   instructions=(

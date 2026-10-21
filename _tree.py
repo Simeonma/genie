@@ -1,7 +1,7 @@
-"""把包名 genie 钉到本仓 genie-sdk/ 的引导件（conftest 与子进程锚共用）。
+"""把 import 名 genie 钉到本仓 genie-sdk/ 的引导件（conftest 与子进程锚共用）。
 
-为什么需要它：源码目录叫 genie-sdk（与仓名一致），而目录名带连字符不能作
-包名，`import genie` 无法靠 ``sys.path`` 命中；等价物是 pyproject 里那条
+为什么需要它：源码目录叫 genie-sdk（分发名同名），而目录名带连字符不能作
+import 名，`import genie` 无法靠 ``sys.path`` 命中；等价物是 pyproject 里那条
 ``[tool.setuptools] package-dir = { genie = "genie-sdk" }``——那是给安装用的，
 开发/测试期由本文件提供同一映射。
 
@@ -16,7 +16,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 PKG_DIR = ROOT / "genie-sdk"
 
-_EDITABLE_PREFIX = "__editable___genie_"
+_EDITABLE_PREFIX = "__editable___genie_"  # 同时命中旧名 genie 与新名 genie-sdk 的 editable 安装
 
 
 class _LocalGenieFinder:

@@ -1,5 +1,5 @@
 # ── GENIE Cloud SDK 脚本 · 由 GENIE Studio 表单自动生成 ──
-# 本地运行: pip install genie  # from <YOUR_GENIE_RELEASE_CHANNEL>
+# 本地运行: pip install genie-sdk  # from <YOUR_GENIE_RELEASE_CHANNEL>
 import genie
 
 f = genie.connect('https://genie.example.com', api_key="YOUR_API_KEY", username="YOUR_USERNAME")

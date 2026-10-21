@@ -3,12 +3,10 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "genie"
+name = "genie-sdk"
 version = "2.0.0a6"
 description = "GENIE SDK v2 — 脚本构建仿真、f.run() 提交云端 GPU；preview_script 零网络预览（模型与提交互不相干）"
-readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
 dependencies = [
     "requests>=2.28",
     "numpy>=1.24",
@@ -37,7 +35,7 @@ genie = "genie.__main__:main"
 genie-mcp = "genie.integrations.mcp:main"
 
 # 打包白名单（framework §四 目录树的全部子包；显式列表防误收）
-# package-dir：源码目录叫 genie-sdk（与仓名一致），包名仍是 genie（import genie）。
+# package-dir：源码目录叫 genie-sdk（分发名/import 名三方视觉统一），import 名仍是 genie。
 # 目录名带连字符不能作包名，靠这条映射把 genie.* 解析到 genie-sdk/*；
 # wheel 内路径依然是 genie/，所以 install 地址与发布门断言都不用动。
 [tool.setuptools]

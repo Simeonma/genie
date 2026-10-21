@@ -49,7 +49,7 @@ def render(cfg: dict, origin: str | None = None) -> str:
 
     head = [
         "# ── GENIE Cloud SDK 脚本 · 由 GENIE Studio 表单自动生成 ──",
-        "# 本地运行: pip install genie  # from <YOUR_GENIE_RELEASE_CHANNEL>",
+        "# 本地运行: pip install genie-sdk  # from <YOUR_GENIE_RELEASE_CHANNEL>",
         "import genie",
         "",
         'f = genie.connect(' + esc_origin + ', api_key="YOUR_API_KEY", username="YOUR_USERNAME")',
