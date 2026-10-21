@@ -335,7 +335,7 @@ SDK Docs</a></div></div>
 <tr><td><code>.name(s)</code></td><td>yes</td><td>—</td><td>Results are grouped by it in the result file</td></tr>
 <tr><td><code>.center(x, y, z)</code></td><td>no</td><td>origin</td><td>Center (m)</td></tr>
 <tr><td><code>.size(x, y, z)</code></td><td>no</td><td>type-specific</td><td>Extents (m); a <code>None</code> slot = full extent on that axis. time/freq default to a <code>(0,0,0)</code> point monitor, index defaults to full extent on all three</td></tr>
-<tr><td><code>.field(f)</code></td><td>no</td><td>—</td><td>Field selection; valid set per subsection below</td></tr>
+<tr><td><code>.field(f)</code></td><td>yes</td><td>—</td><td>Field selection; valid set per subsection below (dialect-required: no silent default)</td></tr>
 </tbody></table></div>
 <h2 id="f-mon-add-time"><a class="anchor" href="#f-mon-add-time" aria-label="Link to this section">#</a><code>f.mon.add_time()</code></h2>
 <p>Time-domain recorder: logs fields at every time step — use it for pulse waveforms and time-domain reflection. Fields: <code>Ex Ey Ez Hx Hy Hz all</code>.</p>

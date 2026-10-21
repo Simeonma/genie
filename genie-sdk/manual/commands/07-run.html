@@ -332,9 +332,9 @@ SDK Docs</a></div></div>
 <p><img src="figs/fig-lifecycle.svg" alt="Lifecycle" loading="lazy"></p>
 <h2 id="f-parameters"><a class="anchor" href="#f-parameters" aria-label="Link to this section">#</a><code>f.parameters()</code></h2>
 <p>Sets/merges the <strong>global parameter table</strong> (<code>{name: value | expression string}</code>) — referenced by expression slots in any numeric config field and by sweep axes; repeated calls accumulate.</p>
-<pre class="code"><code>f.<span class="fn">parameters</span>({<span class="str">&#x27;d&#x27;</span>: <span class="num">1e-6</span>, <span class="str">&#x27;gap&#x27;</span>: <span class="str">&#x27;{d} / 10&#x27;</span>})
-f.mesh.dx = <span class="str">&#x27;{d} / 40&#x27;</span>          <span class="cm"># expression slot: evaluated server-side</span>
-f.geom.<span class="fn">add_box</span>().<span class="fn">name</span>(<span class="str">&#x27;core&#x27;</span>).<span class="fn">x_range</span>(<span class="num">0</span>, <span class="str">&#x27;{d}&#x27;</span>)</code></pre>
+<pre class="code"><code>f.<span class="fn">parameters</span>({<span class="str">&#x27;d&#x27;</span>: <span class="num">1e-6</span>, <span class="str">&#x27;gap&#x27;</span>: <span class="str">&#x27;d / 10&#x27;</span>})
+f.mesh.dx = <span class="str">&#x27;d / 40&#x27;</span>          <span class="cm"># expression slot: evaluated server-side</span>
+f.geom.<span class="fn">add_box</span>().<span class="fn">name</span>(<span class="str">&#x27;core&#x27;</span>).<span class="fn">x_range</span>(<span class="num">0</span>, <span class="str">&#x27;d&#x27;</span>)</code></pre>
 <div class="kv"><span class="kv-k">Common pitfalls</span><span class="kv-v"></span></div>
 <ul><li>Referencing an undefined parameter inside an expression string — the submission-boundary precheck rejects it outright (GenieConfigError, with kind/msg); nothing is evaluated locally.</li><li>Expecting a sweep to change the <code>dx</code> literal — sweep axes can only vary <strong>parameter names</strong> (see page 08).</li></ul>
 <h2 id="f-run"><a class="anchor" href="#f-run" aria-label="Link to this section">#</a><code>f.run()</code></h2>

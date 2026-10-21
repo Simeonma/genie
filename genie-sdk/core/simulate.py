@@ -228,7 +228,7 @@ class Simulation:
         全配置数值字段的表达式槽与 sweep 轴引用::
 
             f.parameters({'d': 1e-6})
-            f.mesh.dx = '{d} / 4'
+            f.mesh.dx = 'd / 4'
         合并语义（不整表替换）——多次调用累积。"""
         cur = getattr(self._cfg, "parameters", None) or {}
         cur.update(table)

@@ -12,9 +12,9 @@ string}`) — referenced by expression slots in any numeric config field and
 by sweep axes; repeated calls accumulate.
 
 ```python
-f.parameters({'d': 1e-6, 'gap': '{d} / 10'})
-f.mesh.dx = '{d} / 40'          # expression slot: evaluated server-side
-f.geom.add_box().name('core').x_range(0, '{d}')
+f.parameters({'d': 1e-6, 'gap': 'd / 10'})
+f.mesh.dx = 'd / 40'          # expression slot: evaluated server-side
+f.geom.add_box().name('core').x_range(0, 'd')
 ```
 
 **Common pitfalls**

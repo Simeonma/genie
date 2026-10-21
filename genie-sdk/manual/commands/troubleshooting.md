@@ -11,11 +11,12 @@ You call `f.run()` (or `f.sweep()`) and get a `GenieConfigError` before
 anything reaches the server, or a 422 listing fields right after.
 
 **Cause: an expression references an undefined parameter.** Numeric slots
-accept expression strings like `'{d}/4'`, evaluated server-side against the
-table set by `f.parameters()` — nothing is evaluated locally, so a typo'd or
-missing name is only caught at the submission boundary, as `GenieConfigError`
-(with `kind`/`msg`).
-Diagnostic: check that every `'{...}'` slot has a matching key in your
+accept expression strings like `'d/4'` (bare parameter names — braces such as
+`'{d}/4'` are a Python set literal and get rejected), evaluated server-side
+against the table set by `f.parameters()` — nothing is evaluated locally, so
+a typo'd or missing name is only caught at the submission boundary, as
+`GenieConfigError` (with `kind`/`msg`).
+Diagnostic: check that every expression slot has a matching key in your
 `f.parameters()` calls (repeated calls merge, they don't replace).
 Fix: define the parameter before submitting — see
 [f-submit-lifecycle.html](07-run.html).

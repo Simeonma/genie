@@ -2,7 +2,7 @@
 
 > Two module-level entries: `genie.connect()` opens a session; `genie.preview_script()`
 > executes a script with zero network. All units are SI; numeric slots also accept
-> expression strings (`"20[nm]"`, `"{d}/4"` via `f.parameters`), evaluated server-side.
+> expression strings (`"20[nm]"`, `"d/4"` via `f.parameters`), evaluated server-side.
 
 ## `genie.connect()`
 

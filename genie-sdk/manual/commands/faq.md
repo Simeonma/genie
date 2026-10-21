@@ -154,13 +154,13 @@ You cannot mutate a submitted instance. Either export `f.to_script()`, tweak the
 
 ## Units & expressions
 
-### Can I write `"{d}/4"` instead of a number?
+### Can I write `"d/4"` instead of a number?
 
-Yes — every numeric slot accepts an expression string evaluated **server-side**, referencing the global parameter table set by `f.parameters()` (repeated calls merge). Referencing an undefined parameter is rejected at the submission boundary, not locally. See [07 · Submit](07-run.html) and [00 · Connections](00-connect.html).
+Yes — every numeric slot accepts an expression string evaluated **server-side**, referencing the global parameter table set by `f.parameters()` (repeated calls merge). Use bare parameter names (`'d/4'`, not `'{d}/4'` — braces are a Python set literal and get rejected); unit suffixes like `'50[nm]'` also work. Referencing an undefined parameter is rejected at the submission boundary, not locally. See [07 · Submit](07-run.html) and [00 · Connections](00-connect.html).
 
 ```python
-f.parameters({'d': 1e-6, 'gap': '{d} / 10'})
-f.mesh.dx = '{d} / 40'
+f.parameters({'d': 1e-6, 'gap': 'd / 10'})
+f.mesh.dx = 'd / 40'
 ```
 
 ### How do I build common structures quickly?

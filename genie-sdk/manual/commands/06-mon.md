@@ -12,7 +12,7 @@
 | `.name(s)` | yes | — | Results are grouped by it in the result file |
 | `.center(x, y, z)` | no | origin | Center (m) |
 | `.size(x, y, z)` | no | type-specific | Extents (m); a `None` slot = full extent on that axis. time/freq default to a `(0,0,0)` point monitor, index defaults to full extent on all three |
-| `.field(f)` | no | — | Field selection; valid set per subsection below |
+| `.field(f)` | yes | — | Field selection; valid set per subsection below (dialect-required: no silent default) |
 
 ## `f.mon.add_time()`
 
