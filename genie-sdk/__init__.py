@@ -94,7 +94,17 @@ def _wire_core_hooks() -> None:
         expert_factory=lambda client: ExpertSession(client),
         publish=_publish,
     )
-    _material._wire(remote_nk_fetch=_client.fetch_nk_payload)
+    def _nk_fetch_via_store(name, url, key, user, timeout):
+        """材质库 HTTP 回退的凭据仓版（G72③ 收编散兵）：core 只给
+        env/显式值，这里沿 显式>env>凭据仓 链补全，报错带指路。"""
+        from .net.config import resolve_credential, resolve_gateway
+        return _client.fetch_nk_payload(
+            name, resolve_gateway(url),
+            resolve_credential(key, "GENIE_API_KEY", "api_key"),
+            username=resolve_credential(user, "GENIE_USERNAME", "username"),
+            timeout=timeout)
+
+    _material._wire(remote_nk_fetch=_nk_fetch_via_store)
     _preview._wire(_swap_connect)
 
 
@@ -136,18 +146,26 @@ def connect(base_url: str | None = None, api_key: str | None = None,
             timeout: float = 30.0) -> Simulation:
     """连接 GENIE 服务 → Simulation（≈ 本地包的 ``FDTD()``）。
 
-    认证二选一：``api_key``（直接 token）或 ``username``+``password``
-    （先 POST /api/auth/login 换 token，后续请求自动带上）——推荐后者。
-    ``base_url`` / ``api_key`` / ``username`` / ``password`` 解析优先级：
-    显式参数 > env（``GENIE_URL`` / ``GENIE_API_KEY`` / ``GENIE_USERNAME``
-    / ``GENIE_PASSWORD``）> ``~/.genie/config.json``（``genie connect``
-    写入）。全都没配 → 报错带下一步动作（``genie connect <地址>``）。
+    两条轨（G72 终稿）：
+
+    - **裸 ``connect()``** → 会话代持轨：经门牌找到本机会话（没有就在
+      进程内起一个无头会话），凭据由会话持有——**脚本零凭据**，token
+      不进脚本的世界。登录由人在 Studio 登录闸或 ``genie login`` 完成。
+    - **显式参数 / env（``GENIE_URL`` 等）** → 直连轨（脚本自包含、测试、
+      机器预置 ``GENIE_USERNAME/PASSWORD``）：``api_key`` 或
+      ``username``+``password``（POST /api/auth/login 换 token）二选一。
+
     返回对象的 ``domain/mesh/mat/geom/src/mon`` 六个子对象与本地包同名
     同手感。
     """
     from .net import client as _client_mod
     from .net.config import resolve_credential, resolve_gateway
 
+    if base_url is None and api_key is None and password is None \
+            and not os.environ.get("GENIE_URL"):
+        via = _connect_via_session(_client_mod, timeout=timeout)
+        if via is not None:
+            return via
     url = resolve_gateway(base_url)
     key = resolve_credential(api_key, "GENIE_API_KEY", "api_key")
     user = resolve_credential(username, "GENIE_USERNAME", "username")
@@ -159,3 +177,59 @@ def connect(base_url: str | None = None, api_key: str | None = None,
             raise ValueError("password 登录需要同时给 username")
         client.login(user, pwd)
     return Simulation(client)
+
+
+def _connect_via_session(client_mod, *, timeout: float):
+    """会话代持轨（G72）：返回 Simulation 或 None（None = 落回直连轨）。
+
+    顺序：① 门牌上有活会话 → 经它的 /gw；② 没有且允许自起 → 进程内起
+    无头会话（凭据仓载入；无凭据 → 指路错误，不起空会话）；③ studio
+    未装（无 server extra）或 GENIE_SESSION_AUTOSTART=0 → None 落直连。
+    """
+    from .models.errors import GenieConfigError
+    from .net.config import load_config
+
+    try:
+        from .studio import rendezvous as rv
+    except ImportError:      # 无 server extra：会话形态不存在
+        return None
+
+    def _alive(url: str) -> bool:
+        # 门牌纪律"不做存活探测"防的是**复用旧会话的模型态**；这里只用
+        # 它的 /gw 代理（无状态），探测死门牌是为了不把用户引向死路。
+        try:
+            import requests as _rq
+            return _rq.get(url.rstrip("/") + "/health",
+                           timeout=1.5).status_code == 200
+        except Exception:    # noqa: BLE001 —— 死门牌 = 没有会话
+            return False
+
+    card = rv.read()
+    if card and card.get("url") and _alive(card["url"]):
+        return Simulation(client_mod.Client(
+            card["url"].rstrip("/") + "/gw", None, timeout=timeout,
+            extra_headers={"X-Session-Token": card.get("token", "")}
+            if card.get("token") else None))
+
+    if os.environ.get("GENIE_SESSION_AUTOSTART", "1") == "0":
+        return None
+    if not (load_config().get("api_key")
+            or os.environ.get("GENIE_API_KEY")):
+        raise GenieConfigError(
+            "尚未登录——会话没有可代持的凭据。两个入口任选其一：\n"
+            "  ① genie login            （终端，输一次账号密码）\n"
+            "  ② genie studio           （GUI 登录闸，输一次账号密码）")
+    import secrets as _secrets
+
+    from .studio import session_service as ss
+    token = _secrets.token_urlsafe(24)
+    ss.set_token(token)
+    _server, port = ss.serve(0, token=token)
+    base = f"http://127.0.0.1:{port}"
+    rv.write(url=base, token=token)
+    try:
+        return Simulation(client_mod.Client(
+            base + "/gw", None, timeout=timeout,
+            extra_headers={"X-Session-Token": token}))
+    except Exception:        # noqa: BLE001 —— 起失败不拦脚本，落直连
+        return None

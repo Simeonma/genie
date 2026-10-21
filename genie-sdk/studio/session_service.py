@@ -26,6 +26,7 @@ OS 分配、地址与口令经内存 + rendezvous 文件显式传递），**不�
 """
 from __future__ import annotations
 
+import json
 import os
 import threading
 
@@ -273,7 +274,46 @@ def _backend() -> str:
 
 
 # 白名单：会话只代拨这几族。别的路径一律 403（不做通用代理）。
-_GW_ALLOW = ("whoami", "api/auth/", "api/tools/", "api/jobs")
+# （api/health：Client.health() 经 /gw 走会话轨时需要。）
+_GW_ALLOW = ("whoami", "api/auth/", "api/tools/", "api/jobs", "api/health")
+
+
+# ── 会话代持凭据（G72 终稿：token 只住会话，脚本零凭据）────────────
+# 进程内缓存，首用从凭据仓（~/.genie/credentials.json）载入；
+# 登录截获（下方 _capture_login）即时更新内存 + 落盘。
+_CRED: dict | None = None
+
+
+def _stored_cred() -> dict:
+    """会话当前持有的凭据 {api_key, username}（无则空 dict）。"""
+    global _CRED
+    if _CRED is None:
+        from genie.net.config import load_config
+        cfg = load_config()
+        _CRED = ({"api_key": cfg["api_key"], "username": cfg.get("username")}
+                 if cfg.get("api_key") else {})
+    return _CRED
+
+
+def _capture_login(data: bytes, content: bytes) -> None:
+    """登录成功的**单一截获点**：POST api/auth/login 200 → token 入仓。
+
+    GUI 登录闸与任何经 /gw 的登录都从这儿过（gateway_forward 是唯一咽喉），
+    于是"人在哪个面输密码"对凭据仓透明。
+    """
+    global _CRED
+    try:
+        body = json.loads(data or b"{}")
+        resp = json.loads(content)
+        token = resp.get("token") or resp.get("api_key")
+        if not token:
+            return
+        username = str(body.get("username") or body.get("name") or "")
+        from genie.net.config import save_config
+        save_config(api_key=token, username=username or None)
+        _CRED = {"api_key": token, "username": username}
+    except Exception:   # noqa: BLE001 —— 截获失败绝不拦登录本身
+        pass
 
 
 def _gw_allowed(path: str) -> bool:
@@ -309,19 +349,33 @@ def gateway_forward(method: str, path: str, *, key: str = "",
 
     HTTP 路由（`/gw/{path}`）与同进程适配器（`LocalSessionHost`）都调它
     ——所以"上游不可达"的翻译只有一处，无论调用方在不在本进程。
+
+    凭据代持（G72）：调用方没带 key 时用**会话持有的凭据**代拨——脚本
+    经 /gw 的请求从头到尾不碰 token。
     """
     if not _gw_allowed(path):
         raise HTTPException(status_code=403,
                             detail=f"会话不代拨该路径：/{path}")
+    cred = _stored_cred() if not key else {}
+    headers = {}
+    if key:
+        headers["X-API-Key"] = key
+    elif cred.get("api_key"):
+        headers["X-API-Key"] = cred["api_key"]
+        if cred.get("username"):
+            headers["X-Username"] = cred["username"]
     import requests as _rq
     try:
         r = _rq.request(
             method, f"{_backend()}/{path.lstrip('/')}",
             data=data or None, params=params,
-            headers={"X-API-Key": key} if key else None,
+            headers=headers or None,
             timeout=float(timeout))
     except Exception as e:  # noqa: BLE001 — 唯一一次翻译
         raise _upstream_down(e) from e
+    if (method.upper() == "POST" and path.lstrip("/") == "api/auth/login"
+            and r.status_code == 200):
+        _capture_login(data or b"", r.content)     # 登录截获（单一咽喉点）
     return r.status_code, r.content, r.headers.get("content-type", "")
 
 

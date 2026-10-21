@@ -547,13 +547,14 @@ def load_library_nk(name, base_url=None, api_key=None, username=None,
         raise ValueError(
             f"本地材质库无库名 {name!r}（离线模式不回退 HTTP；"
             "genie.material.list_library_materials() 可列本地全部库名）")
-    url = base_url or os.environ.get("GENIE_URL")
-    if not url:
-        raise ValueError(
-            "load_library_nk 需要 base_url（或设置环境变量 GENIE_URL）——"
-            "无法连接材质库；请先用 genie.connect(...) 指定服务器")
+    url = base_url or os.environ.get("GENIE_URL")   # 可能为 None——组合根
+    # 的 hook（G72 会话代持）还会沿 凭据仓>缺省 链补；这里不预拦。
     fetch = hooks.get("remote_nk_fetch")
     if fetch is None:
+        if not url:
+            raise ValueError(
+                "load_library_nk 需要 base_url（或设置环境变量 GENIE_URL）——"
+                "无法连接材质库；请先用 genie.connect(...) 指定服务器")
         raise RuntimeError(
             "材质库 HTTP 回退未接线——组合根（genie/__init__）负责注入；"
             "正常 ``import genie`` 即完成接线")

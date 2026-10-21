@@ -18,21 +18,27 @@ sub-objects mirror the local fdtd package: `f.domain` ([Domain](#f-domain-physic
 | `username` | str | No | see priority below | Username (metering attribution) |
 | `timeout` | float | No | 30.0 | HTTP timeout (s, keyword-only) |
 
-**Where values come from** — priority chain (highest wins):
+**Two rails (pick by how you call it):**
 
 ```text
-explicit argument  >  env (GENIE_URL / GENIE_API_KEY / GENIE_USERNAME)
-                   >  ~/.genie/config.json  >  built-in default
+bare genie.connect()          → session rail: finds the local session
+                                (Studio's, or an in-process headless one)
+                                and rides its gateway egress. The script
+                                never holds a credential — the session does.
+explicit args / GENIE_URL env → direct rail: self-contained scripts, tests,
+                                machines provisioned with GENIE_USERNAME /
+                                GENIE_PASSWORD.
 ```
 
-Configure once on a machine with the CLI, then call `genie.connect()` bare:
+Login once per machine (either surface writes the same session-held token):
 
 ```bash
-genie connect https://genie.example.com --username me   # writes ~/.genie/config.json (0600)
-genie connect                                           # show current resolution
-genie login                                             # interactive: get a token via device authorization
-genie logout                                            # revoke remotely + clear locally
+genie login                     # terminal: username + password, once
+genie studio                    # or log in once in the Studio login gate
+genie connect https://genie.example.com   # set the machine's gateway, once
 ```
+
+Tokens are idle-expiring (7 days unused; actively used tokens never expire) — on expiry just log in again in the same surface you used before.
 
 ```python
 import genie
@@ -44,7 +50,7 @@ f = genie.connect("https://genie.example.com", api_key="…")
 **Common pitfalls**
 
 - A `Simulation` can only be submitted once — tweaking an already-`run()` `f` and rerunning silently resends the old configuration; create a fresh `connect()`.
-- With nothing configured anywhere, `connect()` raises `GenieConfigError` telling you to run `genie connect <address>` (or set `GENIE_URL`) — the error is the instruction.
+- On a fresh machine with nothing configured, bare `connect()` raises `GenieConfigError` telling you to run `genie login` (after `genie connect <address>` if the gateway isn't set) — the error is the instruction.
 - Inside a Studio session, `genie.connect` is taken over by the session (zero-network preview) and connection parameters are ignored — expected behavior.
 
 **See also** [Simulation state machine & run()](#f-submit-lifecycle)

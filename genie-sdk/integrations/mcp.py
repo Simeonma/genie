@@ -407,6 +407,9 @@ def _do_get_results(cli, args: dict) -> dict:
 def execute_tool(name: str, args: dict, *, session: Any = None) -> dict:
     """执行一个工具（供 MCP 与自测共用）。未知工具 → 显式错误。"""
     args = args or {}
+    if name not in TOOL_NAMES:      # 先判名字：不因"没在跑的 Studio"遮蔽
+        return {"ok": False,
+                "error": f"未知工具 {name}（可用: {sorted(TOOL_NAMES)}）"}
     if name == "get_starter_script":
         return starter_script()
     if name == "check_script":
@@ -432,7 +435,8 @@ def execute_tool(name: str, args: dict, *, session: Any = None) -> dict:
         return {"ok": False, "error": str(e), "session": False}
     except Exception as e:  # noqa: BLE001 —— 工具失败要说人话，不抛给 LLM
         return {"ok": False, "error": f"{type(e).__name__}: {str(e)[:400]}"}
-    return {"ok": False, "error": f"未知工具 {name}（可用: {sorted(TOOL_NAMES)}）"}
+    return {"ok": False,
+            "error": f"工具 {name} 未接线（可用: {sorted(TOOL_NAMES)}）"}
 
 
 def _openai_tools() -> list[dict]:

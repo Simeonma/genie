@@ -70,7 +70,8 @@ class Client:
 
     def __init__(self, base_url: str, api_key: str | None = None,
                  username: str | None = None, timeout: float = 30.0,
-                 timeout_download: float | None = None):
+                 timeout_download: float | None = None,
+                 extra_headers: dict | None = None):
         if not base_url:
             raise ValueError(
                 "connect() 需要 base_url（或设置环境变量 GENIE_URL）")
@@ -89,17 +90,23 @@ class Client:
         if username:
             # P1 用户名+key 双输入：服务器校验与 key 条目 name 配对
             self._s.headers["X-Username"] = username
+        if extra_headers:
+            # 会话轨（G72）：经 /gw 代理时带 X-Session-Token 等本机口令。
+            self._s.headers.update(extra_headers)
 
     # ---- 基石 ----
 
     def _req(self, method: str, path: str, *, ok: tuple[int, ...] = (200,),
              json_body: Any = None,
              timeout: float | None = None) -> requests.Response:
+        eff = self.timeout if timeout is None else timeout
+        # 会话轨的代理按 X-Upstream-Timeout 控制上游超时（直连时网关
+        # 忽略未知头，无害）——否则 /gw 的 120s 缺省会盖掉本地设置。
+        self._s.headers["X-Upstream-Timeout"] = str(eff)
         try:
             r = self._s.request(method, self.base_url + path,
                                 json=json_body,
-                                timeout=self.timeout if timeout is None
-                                else timeout)
+                                timeout=eff)
         except requests.RequestException as e:
             # S3（audit 批 α）：不加自动重试（YAGNI），只提示可重入——
             # 网络瞬断对该 API 是安全操作（幂等读 / 提交前重试）。
