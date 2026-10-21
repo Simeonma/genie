@@ -150,6 +150,48 @@ def test_identity_clear_endpoint(monkeypatch):
     assert ss._CRED == {}
 
 
+# ── genie logout：/tokens/self 精确自吊销 ─────────────────────────
+
+def test_cli_logout_revokes_self_and_clears(monkeypatch, capsys):
+    import requests
+    from genie.__main__ import main
+    ncfg.save_config(api_key="gt_mine", username="dora",
+                     gateway="https://gw")
+    seen: dict = {}
+
+    def _fake(self, url, **kw):
+        seen["url"] = url
+        return _Resp(status=204)
+
+    monkeypatch.setattr(requests.Session, "delete", _fake)
+    assert main(["logout"]) == 0
+    assert seen["url"].endswith("/api/auth/tokens/self")
+    cfg = ncfg.load_config()
+    assert "api_key" not in cfg and "username" not in cfg
+    assert "gateway" in cfg                      # 网关地址保留（机器事实）
+    assert "已吊销" in capsys.readouterr().out
+
+
+def test_cli_logout_remote_failure_still_clears_local(monkeypatch, capsys):
+    import requests
+    from genie.__main__ import main
+    ncfg.save_config(api_key="gt_mine", gateway="https://gw")
+
+    def _boom(self, url, **kw):
+        raise requests.ConnectionError("down")
+
+    monkeypatch.setattr(requests.Session, "delete", _boom)
+    assert main(["logout"]) == 0
+    assert "api_key" not in ncfg.load_config()
+    assert "仍会清除" in capsys.readouterr().out
+
+
+def test_cli_logout_no_credentials_noop(capsys):
+    from genie.__main__ import main
+    assert main(["logout"]) == 0
+    assert "无需登出" in capsys.readouterr().out
+
+
 # ── 迁移：config.json → credentials.json ───────────────────────────
 
 def test_old_config_adopted_and_removed(tmp_path, monkeypatch):

@@ -226,8 +226,8 @@ def cmd_login(args: argparse.Namespace) -> int:
 
 
 def cmd_logout(args: argparse.Namespace) -> int:
-    """``genie logout``：清本机凭据；远端吊销用 ``--token-id``（网关的
-    token 列表不带哈希，无法自动认出"本机这把"，宁缺勿误杀）。"""
+    """``genie logout``：吊销本机这把 token（``DELETE /api/auth/tokens/self``，
+    按 key 吊销自己，同账号其它设备不受影响）+ 清本机凭据。"""
     from genie.net.client import Client
     from genie.net.config import clear_config, resolve_credential, resolve_gateway
 
@@ -235,20 +235,19 @@ def cmd_logout(args: argparse.Namespace) -> int:
     if not key:
         print("· 本机没有已存的 token，无需登出")
         return 0
-    if args.token_id:
-        url = resolve_gateway(getattr(args, "gateway", None) or None)
-        try:
-            r = Client(url, key)._s.delete(
-                f"{url}/api/auth/tokens/{args.token_id}", timeout=10)
-            print(f"· 网关侧吊销 id={args.token_id}：HTTP {r.status_code}"
-                  + ("（已吊销）" if r.status_code < 300 else "（失败）"))
-        except Exception as e:  # noqa: BLE001 —— 本地清理不因网络失败而跳过
-            print(f"⚠ 远端吊销失败（{e}）——本地仍会清除")
-    else:
-        print("· 只清本机（要吊销远端：genie logout --token-id <id>，"
-              "id 见 GET /api/auth/tokens）")
-    clear_config("api_key")
-    print("✓ 已清除本机 token")
+    url = resolve_gateway(getattr(args, "gateway", None) or None)
+    try:
+        r = Client(url, key)._s.delete(f"{url}/api/auth/tokens/self",
+                                       timeout=10)
+        if r.status_code < 300:
+            print("✓ 网关侧已吊销本机 token（同账号其它设备不受影响）")
+        else:
+            print(f"⚠ 远端吊销失败（HTTP {r.status_code}）——本地仍会清除，"
+                  "该 token 到期前在远端仍有效")
+    except Exception as e:  # noqa: BLE001 —— 本地清理不因网络失败而跳过
+        print(f"⚠ 远端吊销失败（{e}）——本地仍会清除")
+    clear_config("api_key", "username")
+    print("✓ 已清除本机凭据")
     return 0
 
 
@@ -284,10 +283,8 @@ def main(argv: list[str] | None = None) -> int:
     lg.add_argument("--username", default="", help="用户名或邮箱（缺省交互输入）")
     lg.add_argument("--gateway", default="", help="网关地址（缺省走解析链）")
     lg.set_defaults(fn=cmd_login)
-    lo = sub.add_parser("logout", help="清除本机凭据（远端吊销用 --token-id）")
+    lo = sub.add_parser("logout", help="吊销本机 token（/tokens/self）并清除本机凭据")
     lo.add_argument("--gateway", default="", help="网关地址（缺省走解析链）")
-    lo.add_argument("--token-id", type=int, default=None,
-                    help="要吊销的远端 token id")
     lo.set_defaults(fn=cmd_logout)
     ns = ap.parse_args(argv)
     if ns.cmd is None:                  # 裸敲 genie = studio（一键形态）
