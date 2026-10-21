@@ -1,7 +1,8 @@
 # 06 · f.mon — monitors
 
 > Three monitor types (time/freq/index). **`name` is the addressing key when
-> retrieving results** (`f.get_time('tr')`), so always name your monitors.
+> retrieving results** (`f.get_time('tr')`), so monitors should always
+> be named.
 
 ![Monitor placement](figs/fig-monitors.svg)
 
@@ -17,16 +18,14 @@
 ## Naming rules
 
 Within one monitor type, duplicate names are rejected with 422 during
-validation (`SimConfig._check` in `genie-sdk/models/_wire.py` deduplicates
-same-type monitors only). The same name across different monitor types is
-legal — cross-type collisions are not checked. (For comparison: duplicate
-material names are not rejected; the later entry simply overwrites the
-earlier one.)
+validation (same-type monitors are deduplicated only). The same name
+across different monitor types is legal — cross-type collisions are not
+checked.
 
 ## `f.mon.add_time()`
 
-Time-domain recorder: logs fields at every time step — use it for pulse
-waveforms and time-domain reflection. Fields: `Ex Ey Ez Hx Hy Hz all`.
+Time monitor (a.k.a. time-domain recorder): logs fields at every time
+step — use it for pulse waveforms and time-domain reflection. Fields: `Ex Ey Ez Hx Hy Hz all`.
 
 ```python
 f.mon.add_time().name('pt').center(0, 0, 500e-9).field('Ez')
@@ -37,7 +36,7 @@ time step.
 
 ## `f.mon.add_freq()`
 
-Frequency-domain recorder: DFT of the time signal, yields the complex
+Freq monitor: DFT of the time signal, yields the complex
 amplitude at each frequency point — the workhorse for transmission/reflection
 spectra. Fields same as time. Frequency points use the unique three-argument
 `.freq(center, bw, n)` form: center (Hz, > 0), bandwidth (Hz, ≥ 0; points
@@ -60,13 +59,13 @@ f.mon.add_freq().name('tr') \
 **Common pitfalls**
 
 - `.freq()` must be the `(center, bw, n)` triple — a single value or list is rejected.
-- `.down_sample((t0, t1), stride)` requires `start < stop` — a reversed window is not an error; it silently samples 0 points with no warning. `stride` must be an int ≥ 1; a float raises `TypeError` directly. Typical uses: skipping late-arriving echoes, or decimating to stay under resource limits.
+- `.down_sample((t0, t1), stride)` requires `start < stop` — a reversed window is rejected with an error. `stride` must be an int ≥ 1; a non-integer stride is truncated toward zero with a warning; always pass int. Typical uses: skipping late-arriving echoes, or decimating to stay under resource limits.
 - Don't place a plane monitor inside the PML — fields in an absorbing layer have no physical meaning.
 - Physical transmittance T requires a plane monitor plus server-side normalization: `digest` reports physical T only when `normalized=true`; point monitors have no area integral and carry no T.
 
 ## `f.mon.add_index()`
 
-Refractive-index/material recorder: outputs the as-built `eps`/`mu`
+Index monitor: outputs the as-built `eps`/`mu`
 distributions — use it to check geometry and meshing. Fields: `eps mu both`.
 
 ```python

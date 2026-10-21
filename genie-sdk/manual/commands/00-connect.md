@@ -8,24 +8,24 @@
 
 Connect to the GENIE service and return a `Simulation` instance (conventionally
 named `f`) — a live configuration object that is serialized and sent to the
-cloud only when `f.run()` submits. Returns: a `Simulation` whose six
-sub-objects mirror the local fdtd package: `f.domain` ([Domain](#f-domain-physical-domain-boundaries)), `f.mesh` ([Grid](#f-mesh-grid-local-refinement)), `f.mat` ([Materials](#f-mat-materials-registry)), `f.geom` ([Geometry](#f-geom-geometry)), `f.src` ([Sources](#f-src-sources)), `f.mon` ([Monitors](#f-mon-monitors)).
+cloud only when `f.run()` submits. Returns: a `Simulation` with six
+sub-objects: `f.domain` ([Domain](#f-domain-physical-domain-boundaries)), `f.mesh` ([Grid](#f-mesh-grid-local-refinement)), `f.mat` ([Materials](#f-mat-materials-registry)), `f.geom` ([Geometry](#f-geom-geometry)), `f.src` ([Sources](#f-src-sources)), `f.mon` ([Monitors](#f-mon-monitors)).
 
 | Param | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `base_url` | str | No | see priority below | Service address — caddy SDK gate (`https://genie.example.com`) for remote SDK, `http://127.0.0.1:8777` for Studio debugging |
+| `base_url` | str | No | see priority below | Service address (`https://genie.example.com`) for remote SDK, `http://127.0.0.1:8777` for Studio debugging |
 | `api_key` | str | No | see priority below | Auth key (sent as `X-API-Key` header) |
 | `username` | str | No | see priority below | Username (metering attribution) |
 | `timeout` | float | No | 30.0 | HTTP timeout (s, keyword-only) |
 
-**Two rails (pick by how you call it):**
+**Two connection modes (picked by how it is called):**
 
 ```text
-bare genie.connect()          → session rail: finds the local session
-                                (Studio's, or an in-process headless one)
-                                and rides its gateway egress. The script
-                                never holds a credential — the session does.
-explicit args / GENIE_URL env → direct rail: self-contained scripts, tests,
+bare genie.connect()          → reuses the local session's credentials
+                                (Studio's, or an in-process headless one).
+                                The script never holds a credential — the
+                                session does.
+explicit args / GENIE_URL env → goes direct: self-contained scripts, tests,
                                 machines provisioned with GENIE_USERNAME /
                                 GENIE_PASSWORD.
 ```
@@ -38,19 +38,19 @@ genie studio                    # or log in once in the Studio login gate
 genie connect https://genie.example.com   # set the machine's gateway, once
 ```
 
-Tokens are idle-expiring (7 days unused; actively used tokens never expire) — on expiry just log in again in the same surface you used before.
+Tokens are idle-expiring (7 days unused; actively used tokens never expire) — on expiry, log in again in the same surface as before.
 
 ```python
 import genie
 
-f = genie.connect()                    # session rail: zero credentials held here
+f = genie.connect()                    # reuses the local session's credentials
 f = genie.connect("https://genie.example.com", api_key="…")
 ```
 
 **Common pitfalls**
 
-- A `Simulation` can only be submitted once — tweaking an already-`run()` `f` and rerunning silently resends the old configuration; create a fresh `connect()`.
-- On a fresh machine with nothing configured, bare `connect()` raises `GenieConfigError` telling you to run `genie login` (after `genie connect <address>` if the gateway isn't set) — the error is the instruction.
+- A `Simulation` can only be submitted once — re-running an already-submitted instance raises `RuntimeError`; create a fresh `connect()` for a new run.
+- On a fresh machine with nothing configured, bare `connect()` raises `GenieConfigError` pointing at `genie login` (after `genie connect <address>` if the gateway isn't set) — the error is the instruction.
 - Inside a Studio session, `genie.connect` is taken over by the session (zero-network preview) and connection parameters are ignored — expected behavior.
 
 **See also** [Simulation state machine & run()](#f-submit-lifecycle)
@@ -88,7 +88,7 @@ else:
 
 - Expecting simulation data from a preview — previews run no jobs; post-processing scripts only get placeholder objects.
 
-**See also** `genie.check_script` / the MCP tool surface (`get_model` / `edit_model` / `run_script`, see `genie/integrations/mcp.py`)
+**See also** `genie.check_script`; for script-driven automation see the agent documentation shipped in `genie/docs/agent.md`
 
 ## Lifecycle of f (overview)
 

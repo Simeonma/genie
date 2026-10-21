@@ -1,6 +1,6 @@
 # 6 · Reading results
 
-> The simulation ran; you hold a results file. This page explains what is
+> The simulation ran; a results file is now in hand. This page explains what is
 > in it, what each quantity means physically, and the three mistakes that
 > most often produce wrong numbers from a healthy simulation.
 
@@ -10,7 +10,7 @@ computed. The judgment happens now, in how the results are read. Most
 wrong numbers in FDTD practice come not from solver bugs but from three
 well-known reading errors (a truncated ring-down, a monitor in the
 wrong place, and raw amplitudes mistaken for physical transmission),
-and all three are detectable from the results file itself if you know
+and all three are detectable from the results file itself once it is known
 where to look. This page builds that skill and ends with a checklist
 that turns it into routine.
 
@@ -18,26 +18,26 @@ that turns it into routine.
 
 `f.run()` auto-downloads a result file (HDF5, `genie-results-h5/1`) into
 `$GENIE_RESULT_DIR` (default `./genie_results/`). Its structure mirrors
-your monitor list — one group per monitor, one dataset per field or axis:
+the monitor list — one entry per monitor, one key per field or axis:
 
 ```
-/tr    Ex, Ey, Ez, Hx, …        # dataset per requested field
-/tr    time                     # axis (time monitor) | freqs (freq monitor)
-/ix    eps, mu                  # index monitor: built ε(r), μ(r)
+f@tr.Ex, f@tr.Ey, f@tr.Ez, …     # flat key per requested field
+f@tr.freqs                       # axis: freqs (freq monitor) | t@tr.time (time monitor)
+i@ix.eps, i@ix.mu                # index monitor: built ε(r), μ(r)
 ```
 
-The mirroring is deliberate: whatever you attached to the simulation
-appears as a group with the monitor's name, so results files stay
-self-describing. A file whose group list does not match your monitor
+Keys on disk are flat — `<prefix>@<monitor>.<field>` (prefix `t@`/`f@`/`i@`
+by monitor kind); the full key protocol lives in
+[09 · results](09-results.html). The SDK additionally offers a grouped
+wrapper view (`data.tr.Ex` via `f.results()`), but the flat keys above are
+what the file actually stores.
+
+The mirroring is deliberate: whatever was attached to the simulation
+appears under the monitor's name, so results files stay
+self-describing. A file whose key list does not match the monitor
 list is a file from a different version of the configuration, and the
-fastest diagnosis of "these numbers look old" is comparing the group
+fastest diagnosis of "these numbers look old" is comparing the monitor
 names against the script that claims to have produced them.
-
-Note that the `/tr Ex` layout above is the SDK's grouped view; the
-actual on-disk file uses flat keys (`t@tr.Ex`, `f@tr.freqs`, …).
-The full key protocol — prefixes, shapes, and the flat per-cell index
-format — lives in [09 · results](09-results.html), and that section is
-authoritative when the two accounts differ.
 
 Three read paths, one file:
 
@@ -55,14 +55,14 @@ path: typed access to one monitor with the axes already attached.
 server before any download and appropriate for harvesting
 normalized quantities like transmission across many runs. Reaching for
 the full file when the digest would do is the usual inefficiency;
-reaching for the digest when you need the raw fields is the usual
+reaching for the digest when the raw fields are needed is the usual
 dead end.
 
 ## Physics of the three monitor types
 
 **Time monitor** → `E(tₙ)` at one point/volume: use it to verify the pulse
 passed, measure reflections by arrival time, and confirm ring-down
-completeness (fields should be ~0 at the end; if not, your
+completeness (fields should be ~0 at the end; if not, the
 `total_time` was too short). One sampling caveat: if the monitor uses
 `.down_sample((t0, t1), stride)`, samples recorded outside that window
 contribute nothing to the frequency-domain results (the solver emits a
@@ -95,18 +95,15 @@ amplitude rotates rapidly through a resonance, a diagnostic that
 survives even when the magnitude contrast is poor.
 
 **Index monitor** → the *built* `ε(r)`, `μ(r)` after rasterization to the
-Yee grid. This is the ground truth of what the solver actually sees —
-always check it once for a new geometry: stair-casing, priority mistakes
-and misplaced shapes show up here, not in the fields.
-
-The distinction between the geometry you declared and the geometry that
-was built is where a large fraction of geometry bugs live. Two
-overlapping shapes resolve by priority order, a cylinder rasterizes
-into a staircase whose effective diameter depends on the grid, and a
-shape that silently fell outside the domain disappears entirely. All of
-this is invisible in the fields — a simulation of the wrong structure
-produces perfectly plausible fields of the wrong structure. One index
-monitor dump per new geometry, read as an image, is the cheapest
+Yee grid — the ground truth of what the solver actually sees. The
+distinction between the geometry declared and the geometry that was
+built is where a large fraction of geometry bugs live: two overlapping
+shapes resolve by priority order, a cylinder rasterizes into a staircase
+whose effective diameter depends on the grid, and a shape reaching
+outside the domain disappears silently ([04 · f.geom](04-geom.html)). All
+of this is invisible in the fields — a simulation of the wrong structure
+produces perfectly plausible fields of the wrong structure — so one
+index-monitor dump per new geometry, read as an image, is the cheapest
 insurance in the workflow.
 
 ## The three classic mistakes
@@ -123,37 +120,30 @@ the window sinc:
 
 Consequences with numbers: the peak widens to `Δf ≈ 1/(πτ)`, and if the
 amplitude has not decayed below `e^{−π}` (≈ 4%) by `T`, sidelobes at the
-−13 dB level of the rectangle window ride on your spectrum. Diagnose
-with a time monitor; fix with `total_time ≳ 3τ` (or `apodize` as
+−13 dB level of the rectangle window ride on the spectrum. The
+corruption is spectral: cutting a resonant signal off mid-ring multiplies
+it by a rectangle, convolving the true lineshape with a sinc — the main
+lobe broadens the measured linewidth (an extracted Q is always an
+underestimate) and the sidelobes imprint ripples spaced `1/T` that can
+masquerade as additional resonances. No post-processing of the spectrum
+can undo this; the information was discarded when the run stopped.
+Diagnose with a time monitor; fix with `total_time ≳ 3τ` (or `apodize` as
 mitigation, at 2× resolution cost — see
 [Tutorial 5](tut5.html)).
 
-The mechanism bears spelling out, because the corruption is spectral and
-therefore invisible in the spectrum's overall shape. The DFT assumed a
-signal multiplied by a rectangle of length T; a resonant signal cut off
-mid-ring is equivalent to a complete signal convolved with the
-rectangle's transform, a sinc. Near the peak, the sinc's main lobe
-broadens the measured linewidth so an extracted Q is always an
-underestimate; further out, the sidelobes imprint ripples spaced `1/T`
-that can masquerade as additional resonances. No post-processing of the
-spectrum can undo this: the information about the true lineshape was
-discarded when the run stopped, and only the time monitor can reveal
-that it happened.
-
-**2 · Monitor in the wrong place.** Inside the source window you measure
-incident + scattered mixed; inside PML you measure nothing physical.
+**2 · Monitor in the wrong place.** Inside the source window the monitor measures
+incident + scattered mixed; inside PML nothing physical is measured.
 Face monitors belong between structure and PML.
 
 Both failure modes produce numbers, which is what makes this mistake
-survive review. A monitor inside the TFSF window reports the coherent
-superposition of the analytic incident wave and the scattered field; at
-frequencies where the two interfere destructively the recorded
-"transmission" dips for reasons that have nothing to do with the
-structure. A monitor inside the PML reports fields being actively
-attenuated as they are absorbed, so its spectrum decays with distance
-into the layer rather than with any physical mechanism. The safe band
-is the gap between the structure and the PML, and one or two cells of
-margin on each side.
+survive review. A monitor inside the TFSF
+(total-field/scattered-field) window reports the coherent superposition
+of the analytic incident wave and the scattered field, so its
+"transmission" dips for reasons unrelated to the structure; a monitor
+inside the PML reports fields being actively attenuated, a spectrum that
+decays with distance into the layer rather than with any physical
+mechanism. The safe band is the gap between the structure and the PML,
+with one or two cells of margin on each side.
 
 **3 · Reading raw amplitudes as transmission.** `|Ẽ|²` from a freq
 monitor is proportional to power only after normalization by the
@@ -198,7 +188,7 @@ resolution is `Δf = 1/T = 500 GHz` against a true linewidth of
 `f₀/Q = 96.5 GHz`: the recorded peak is five times too broad, and the
 extracted Q would come out near 400 regardless of the real cavity.
 The two numbers `Δf = 1/T` and `f₀/Q` should be compared for every
-resonance you intend to quote; the run is honest only when the first is
+resonance intended to be quoted; the run is honest only when the first is
 meaningfully smaller than the second.
 
 ## A post-processing checklist
@@ -212,23 +202,21 @@ it, so early failures are cheap to catch and expensive to skip.
    this run is trustworthy: extend `total_time` toward `3τ` and rerun.
    This single check prevents the majority of wrong-numbers incidents.
 
-2. **Index-monitor check.** View the built `ε(r)` for at least one
-   slice through the structure. Confirm the geometry you intended is
-   the geometry that exists: shapes where they should be, correct
-   priority at overlaps, stair-casing no coarser than the physics can
-   tolerate. A wrong ε(r) invalidates every number computed from the
-   fields, however clean they look.
+2. **Index-monitor check.** View the built `ε(r)` for one slice through
+   the structure and confirm it matches the intended geometry (placement,
+   overlap priority, stair-casing) — a wrong ε(r) invalidates every
+   number computed from the fields.
 
-3. **Resolution check.** For each spectral feature you intend to
+3. **Resolution check.** For each spectral feature intended to be
    report, compare the achievable resolution `Δf = 1/total_time`
    against the feature width — `f₀/Q` for a resonance, the designed
    passband for a filter. The resolution must be comfortably finer
    than the feature; at parity, the reported width is the window's,
    not the physics'.
 
-4. **Normalization check.** Confirm the numbers you are about to quote
+4. **Normalization check.** Confirm the numbers about to be quoted
    come from normalized quantities (`digest()` entries marked
-   `normalized=true`, or an explicit two-run ratio you performed), and
+   `normalized=true`, or an explicit two-run ratio explicitly performed), and
    that for lossy problems the conservation identity `R + T + A = 1`
    closes to within a few percent. Raw `|Ẽ|²` is a shape, not a
    transmission.

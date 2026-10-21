@@ -13,10 +13,10 @@
 | Chain method | Description |
 |---|---|
 | `.material(n)` | References a material name registered in `f.mat` (**required**) |
-| `.center(x, y, z)` | Center in m, defaults to origin — all shapes except `box` (which uses x/y/z_range) |
+| `.center(x, y, z)` | Center in m, defaults to origin — all shapes except `box`, `polygon_z`, `polygon_swept` (which use x/y/z_range or z_range; the polygon shapes have no `.center` and calling it raises `ValueError`) |
 | `.priority(n)` | Integer, larger wins, default 0 |
-| `.height(h)` | Extrusion thickness along z, m, > 0 — prism/ring/ellipse/polygon shapes (polygon shapes may use `.z_range(lo, hi)` instead) |
-| `.name(s)` | Optional display name; shown in the GUI left tree and 3D labels. Omitted → falls back to the type name (`"Box"`, `"N-gon"`, …). Duplicate names are accepted (no uniqueness constraint; two entries sharing a name remain two rows) |
+| `.height(h)` | Extrusion thickness along z, m, > 0 — `ngon`/`ellipse`/`ring`/`cylinder`/`sphere` shapes. `polygon_z`/`polygon_swept` have no `.height`; their vertical extent is set only via `.z_range(lo, hi)` (required) |
+| `.name(s)` | Optional display name; shown in the GUI left tree and 3D labels. Names must be unique — a duplicate is rejected at submission; omit for a type-name default (`"Box"`, `"N-gon"`, …) |
 
 A structure extending beyond the physical domain is **warned about, not rejected** — a partially outside structure may be intentional. This aligns with the pitfall noted in [Tutorial 6](tut6.html) and [Troubleshooting](troubleshooting.html): a shape that silently falls outside the domain disappears entirely from the built geometry.
 
@@ -44,7 +44,7 @@ Cylinder with axis = z; `.radius(r)` in m, > 0, required (chain = shared convent
 
 ## `f.geom.add_ngon_z()`
 
-Regular n-gon prism extruded along z; `.n_sides(k)` ≥ 3 (n=2 vanishes and is blocked by a guard), `.circumradius(r)` circumscribed-circle radius, m, > 0, required.
+Regular n-gon prism extruded along z; `.n_sides(k)` ≥ 3, required (n=2 vanishes and is blocked by a guard), `.circumradius(r)` circumscribed-circle radius, m, > 0, required.
 
 ```python
 f.geom.add_ngon_z().material('sio2').n_sides(6) \
@@ -53,7 +53,7 @@ f.geom.add_ngon_z().material('sio2').n_sides(6) \
 
 ## `f.geom.add_polygon_z()`
 
-Arbitrary polygon extruded along z; `.vertices([(x, y), …])` required. Vertices are **local plane coordinates relative to center** (m), ≥ 3 (sub-polygon-level validation happens in the kernel at build time), all finite. Multiple sub-polygons are separated by sentinel pairs: in Python `(None, None)` or `(nan, nan)`, in JSON text `[null, null]`; a one-sided null is invalid.
+Arbitrary polygon extruded along z; `.vertices([(x, y), …])` required. Vertices are **absolute domain x/y coordinates** (m) — polygon shapes have no center; ≥ 3 (sub-polygon-level validation happens in the kernel at build time), all finite. Multiple sub-polygons are separated by sentinel pairs: in Python `(None, None)` or `(nan, nan)`, in JSON text `[null, null]`; a one-sided null is invalid.
 
 ```python
 f.geom.add_polygon_z().material('sio2').z_range(0, 200e-9) \
@@ -62,7 +62,7 @@ f.geom.add_polygon_z().material('sio2').z_range(0, 200e-9) \
 
 **Common pitfalls**
 
-- Wanting to punch a hole — a hole = a background-material polygon at higher priority over the hole region, or sentinel-separated sub-polygons (forming holes per the kernel's winding rules).
+- Wanting to punch a hole — a hole = a background-material polygon at higher priority over the hole region, or sentinel-separated sub-polygons (forming holes per the even-odd rule).
 
 ## `f.geom.add_ellipse_z()`
 

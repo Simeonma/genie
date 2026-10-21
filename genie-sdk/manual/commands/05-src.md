@@ -35,12 +35,12 @@ f.src.add_soft_source().freq(300e12).bandwidth(60e12) \
 
 ## `f.src.add_plane_wave()`
 
-Plane wave with TFSF (total-field/scattered-field) injection — place scatterers inside the total-field region; leakage behind the source plane is already calibrated for one-way behavior, so used normally you won't see spurious fields "coming in from the back". **Prefer `from_face` to specify the incidence face** — simpler and more reliable than hand-tuning angles.
+Plane wave with TFSF (total-field/scattered-field) injection — place scatterers inside the total-field region; leakage behind the source plane is already calibrated for one-way behavior, so under normal use no spurious fields appear to "come in from the back". **Prefer `from_face` to specify the incidence face** — simpler and more reliable than hand-tuning angles.
 
 | Chain method | Description |
 |---|---|
-| `.from_face(face)` | One of the six faces (`x_min`…`z_max`), i.e. always an `_min` face plus a `direction`: pins the propagation axis, places the injection plane ~2.5 grid cells inside the PML inner edge of that face, and centers the transverse axes on the domain. **Overrides** any previously set `center` and propagation axis/direction; `size` and angles still combine with it. Most common |
-| `.direction('+')` / `'-')` | Along the positive/negative direction of the propagation axis (with from_face/propagation_axis) |
+| `.from_face(face)` | One of the six faces (`x_min`…`z_max`) — any of the six may be given: an `_min` face propagates along `'+'` and an `_max` face along `'-'` automatically, so no separate `.direction()` call is needed. Pins the propagation axis, places the injection plane ~2.5 grid cells inside the PML inner edge of that face, and centers the transverse axes on the domain. **Overrides** any previously set `center` and propagation axis/direction; `size` and angles still combine with it. Most common |
+| `.direction('+')` / `.direction('-')` | Along the positive/negative direction of the propagation axis (with propagation_axis; implied automatically by `from_face`) |
 | `.theta(deg)` / `.phi(deg)` / `.psi(deg)` | Polar θ ∈ [0, 180] (closed interval; 0 = +z) / azimuthal φ ∈ [0, 360) / polarization rotation ψ ∈ [0, 360), where ψ = 0 is s polarization (along e_h) and ψ = 90° is p polarization (along e_v). Out-of-range angles are rejected (HTTP 422) — they do not wrap around |
 | `.amplitude(a)` | Amplitude, default 1.0 |
 | `.size(x, y, z)` | Global transverse window: ≤0/null for the propagation-axis slot, positive for the two transverse slots |
@@ -53,11 +53,11 @@ f.src.add_plane_wave().freq(300e12).bandwidth(60e12) \
 
 **Common pitfalls**
 
-- Oblique incidence + `periodic` boundary — you must use `bloch` (see [Domain & boundaries](#f-domain-physical-domain-boundaries)); also match the `size` transverse window to the bloch boundary.
+- Oblique incidence + `periodic` boundary — `bloch` must be used (see [Domain & boundaries](#f-domain-physical-domain-boundaries)); the `size` transverse window must also match the bloch boundary.
 - Fine-tuning `theta`/`phi` together with `from_face` — from_face is syntax sugar for normal incidence; for oblique incidence set `theta` first.
-- Placing monitors near the TFSF source plane — readings mix incident + scattered fields; keep monitors a few cells away.
-- Default plane-wave polarization is along **Ey** (kernel `_tfsf.py` `_wave_vectors`: φ = 0 gives e_h = v̂, so +z propagation polarizes along ŷ). A time monitor reading `field('Ex')` as identically zero reflects the polarization, not a failed injection.
+- Placing monitors near the TFSF source plane — readings mix incident + scattered fields; monitors must be kept a few cells away.
+- Default plane-wave polarization is along **Ey**; a time monitor reading `field('Ex')` as identically zero reflects the polarization, not a failed injection.
 
 ## `f.src.add_gaussian_beam()`
 
-Gaussian beam = plane wave with full parameters + a transverse Gaussian envelope (for focusing / finite-spot scenarios). Chain = all of plane wave + `.radius(r)`: **aperture radius** on the source plane (m, > 0, required) — do not treat it as the beam width w; the actual 1/e² spot is `w ≈ 0.47·r` (set `radius ≈ 2.12·w` for a desired w). Example: `add_gaussian_beam().freq(300e12).bandwidth(60e12).from_face('z_min').radius(1.5e-6)`.
+Gaussian beam = plane wave with full parameters + a transverse Gaussian envelope (for focusing / finite-spot scenarios). Chain = all of plane wave + `.radius(r)`: **aperture radius** on the source plane (m, > 0, required) — not the beam width; the 1/e² spot is `w ≈ 0.47·r` (derivation and worked examples in [Tutorial 5](tut5.html)). Example: `add_gaussian_beam().freq(300e12).bandwidth(60e12).from_face('z_min').radius(1.5e-6)`.

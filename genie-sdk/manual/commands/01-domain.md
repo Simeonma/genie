@@ -34,7 +34,7 @@ unset face with `pec`; see `api/domain.py:103`). Returns:
 |---|---|---|---|---|
 | `face` | str | Yes | — | `x_min` / `x_max` / `y_min` / `y_max` / `z_min` / `z_max` |
 | `kind` | str | Yes | — | `pec` / `pmc` / `periodic` / `pml` / `bloch` |
-| `layers` | int | No | 12 | pml only: PML layers (≥ 2) |
+| `layers` | int | No | 12 | pml only: PML (perfectly matched layer — an absorbing termination that suppresses reflections at the domain edge) layers (≥ 2) |
 | `kappa_max` | float | No | 1.0 | pml only: max absorption coefficient (≥ 1.0) |
 | `order` | int | No | 3 | pml only: polynomial order (≥ 1) |
 | `k` | (kx, ky, kz) | No | — | bloch only: Bloch wave vector (rad/m) |

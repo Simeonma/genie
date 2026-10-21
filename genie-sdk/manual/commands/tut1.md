@@ -1,8 +1,8 @@
 # 1 · What is FDTD?
 
 > FDTD (Finite-Difference Time-Domain) solves Maxwell's equations directly
-> on a space grid, stepping in time. This page gives the minimal math you
-> need to understand every knob in the SDK. Only vector calculus is assumed.
+> on a space grid, stepping in time. This page gives the minimal math
+> needed to understand every knob in the SDK. Only vector calculus is assumed.
 
 FDTD occupies a specific niche among computational electromagnetics methods.
 Frequency-domain methods (finite elements, method of moments) solve one
@@ -11,8 +11,9 @@ fields forward in time with no matrix at all. A broadband answer falls out
 of a single run, because a short pulse injected into the domain carries all
 frequencies of interest and every monitor records their superposition. The
 price is explicit: the time step is capped by the grid spacing (the CFL
-condition below), so a run that resolves finer structure needs
-proportionally more steps. Every parameter you will meet in this SDK is a
+(Courant–Friedrichs–Lewy) stability limit; see below), so a run that
+resolves finer structure needs
+proportionally more steps. Every parameter in this SDK is a
 lever on one of three things: how space is gridded, how time is stepped,
 and how materials enter the update.
 
@@ -30,8 +31,8 @@ current `M`:
 ```
 
 Everything a FDTD code does is: discretize space, discretize time, and
-integrate these two equations alternately. Given `E` at time `n`, you get
-`H` at `n+½`; from `H` at `n+½` you get `E` at `n+1`. This is the
+integrate these two equations alternately. Given `E` at time `n`, the update yields
+`H` at `n+½`; from `H` at `n+½` it yields `E` at `n+1`. This is the
 **leapfrog** scheme — explicit, second-order accurate, and it needs no
 matrix inversion, which is why the method maps well to GPUs.
 
@@ -43,7 +44,7 @@ space, and leapfrog integrates such pairs with the derivative evaluated at
 the offset time, which is exactly centered in the interval it spans. The
 result is second-order accurate in `Δt` with no extra work. The two source
 terms live in different equations: `J` appears only in the `E` update —
-this is where the SDK injects your `f.src` objects, and it is the only
+this is where the SDK injects `f.src` objects, and it is the only
 place the exterior world ever touches the simulation — while `M` appears
 only in the `H` update. The solver keeps `M` in the equations for
 generality but does not expose it: everything `f.src` produces is an
@@ -64,8 +65,8 @@ E_z  at (i,   j,   k+½)    H_z  at (i+½, j+½, k)
 
 This staggering makes ∇×E centered-difference accurate to second order and
 automatically satisfies charge conservation. It is also why a "cell" in the
-output can be half a step away from where you think a source sits — the
-grid, not your geometry, defines the sample points.
+output can be half a step away from where a source is nominally placed — the
+grid, not the geometry, defines the sample points.
 
 The staggering is not an implementation convenience; it is the discrete
 image of the integral form of Ampère's law. Each `E` component sits on a
@@ -76,12 +77,12 @@ samples around an `E` sample is exactly a discrete circulation of `H` on
 the face. Both differences are centered, which is where the second-order
 accuracy comes from, and the arrangement enforces a discrete ∇·B = 0 to
 machine precision for as long as the simulation runs. The practical
-consequence for you is positional: when the SDK reports that a monitor is
+consequence is positional: when the SDK reports that a monitor is
 at `x = 1.7 μm`, it is placed at the nearest sampling location of the
-component you asked for, which may be up to half a cell from that
-coordinate. With a 15 nm grid the discrepancy is below any physical
-accuracy you can claim anyway, but it explains small systematic offsets
-when you compare monitors on different components.
+requested component, which may be up to half a cell from that
+coordinate. With a 15 nm grid the discrepancy is below any physically
+meaningful accuracy, but it explains small systematic offsets
+when monitors on different components are compared.
 
 ## The discrete update (3D, lossless)
 
@@ -109,14 +110,14 @@ H_x|^{n+½} = H_x|^{n−½} − (Δt/μ) · [ (E_z|_j − E_z|_{j+1}) / Δy
 This has two immediate consequences.
 
 1. **Second order everywhere.** Centered differences and leapfrog are both
-   `O(Δx², Δt²)` — halving `dx` buys you 4× field accuracy at 8× cost
+   `O(Δx², Δt²)` — halving `dx` buys 4× field accuracy at 8× cost
    (2× cells per axis × 2× steps).
 2. **Materials enter as a local coefficient.** The rasterized material
    arrays from `f.mat`/`f.geom` are looked up per component — scalar
    `1/ε(r)` for isotropic media, the tensor inverse for anisotropic ones;
    that is the whole material interface.
 
-Look closely at the update and note that each new value depends only on
+A close look at the update shows that each new value depends only on
 its own four neighbors and its own past value. There is no global coupling
 anywhere in the scheme, which is why the kernel is a stencil sweep over a
 regular array: perfectly coalesced memory access, no synchronization, near
@@ -125,7 +126,7 @@ without any special code; the field at the material interface simply
 updates with a different coefficient on each side. The physics of
 reflection and refraction at that interface emerges from the update; it is
 not put in by hand. The cost of this locality is that all knowledge the
-solver has about your structure is the `ε(r)` array, so whatever errors
+solver has about the structure is the `ε(r)` array, so whatever errors
 the rasterization introduced (staircasing of curved boundaries, half-cell
 placement of facets) are errors the solver will faithfully propagate.
 
@@ -144,11 +145,11 @@ for n in range(n_steps):
     if src_active(n): J = src_profile(n) # inject source into E next
     E += (dt/eps) * (curl(H) - J)        # stencil, symmetric to H update
     apply_E_boundary(E)
-    for m in monitors: m.accumulate(E, H, n)   # running DFT or time sample
+    for m in monitors: m.accumulate(E, H, n)   # running DFT (discrete Fourier transform) or time sample
 ```
 
-Three things in this loop explain behavior you will otherwise find
-mysterious. First, the source is a term in the `E` update, not a separate
+Three things in this loop explain otherwise mysterious behavior.
+First, the source is a term in the `E` update, not a separate
 object living in the grid: a plane wave is implemented as an equivalent
 surface current on the injection face, which is why a source can sit on a
 PML face and still radiate one way. Second, boundaries are applied as
@@ -156,8 +157,8 @@ corrections after each update, so a PML is a set of extra auxiliary
 variables updated alongside `E` and `H`; the cost of `layers = 12` is a
 modest fraction of the total grid. Third, monitor accumulation happens
 every step inside the loop at effectively zero marginal cost, which is why
-a 300-point DFT monitor is free compared to the march itself, and why you
-should feel no reluctance to add monitors: unused data is cheap, a rerun
+a 300-point DFT monitor is free compared to the march itself, and so
+there is no reluctance to add monitors: unused data is cheap, a rerun
 is not.
 
 ## The discrete dispersion relation
@@ -172,9 +173,9 @@ grid (3D) the discrete relation is
 
 which reduces to `ω = c·k` only as `Δx,Δt → 0`. Expanding at small `k·dx`
 gives a leading phase error of order `(k·dx)²/24` per wavelength: waves
-slow down and, off-axis, slow down anisotropically. Keep
-`dx ≤ λ/(10·n)` for ≤0.1%-level phase error per wavelength on-axis, and
-refine if your observable depends on interference between paths of very
+slow down and, off-axis, slow down anisotropically. Keeping
+`dx ≤ λ/(10·n)` bounds the phase error to ≤0.1% per wavelength on-axis,
+and refinement is warranted if the observable depends on interference between paths of very
 different lengths.
 
 The anisotropy deserves attention because it is the error FDTD users
@@ -205,7 +206,7 @@ one step. In 3D with spacings `dx, dy, dz`:
 ```
 
 The SDK exposes this as `f.domain.cfl` (default **0.9**): the actual `Δt`
-is `cfl ×` the stability limit. You normally never touch it.
+is `cfl ×` the stability limit. It normally needs no adjustment.
 
 The physical reading of the inequality: the fastest signal the discrete
 scheme can carry is `c`, and in one step `Δt` the update stencil couples
@@ -262,15 +263,15 @@ by π, and over that lifetime the numerical phase error accumulated at
 at 200 THz that is a 20 GHz shift, which is easily visible in a
 high-resolution spectrum. The rule of thumb "finer near resonant
 structures" is therefore not about resolving geometry: it is about keeping
-the total phase error accumulated over the ring-down below the shift you
-intend to measure. If your observable is a broadband transmission spectrum
+the total phase error accumulated over the ring-down below the shift
+intended to be measured. If the observable is a broadband transmission spectrum
 with 30 GHz features, 10–15 cells per wavelength suffices; if it is a
-Q = 10⁴ mode frequency to within 0.1%, budget refinement accordingly and
-verify by halving `dx` once.
+Q = 10⁴ mode frequency to within 0.1%, refinement should be budgeted
+accordingly and verified by halving `dx` once.
 
 ## What a simulation actually computes
 
-1. **Build**: your config (materials, geometry) is rasterized onto the Yee
+1. **Build**: the config (materials, geometry) is rasterized onto the Yee
    grid → arrays `ε(r)`, `μ(r)`.
 2. **March**: source injects `J`; leapfrog updates `E`/`H` for `n_steps`;
    monitors accumulate their data as the wave passes.
@@ -282,11 +283,11 @@ geometry mistakes surface as unexpected `ε(r)` — a frequency monitor
 placed in the wrong material produces plausible-looking but wrong spectra
 without any warning, so it is worth a `f.digest()` check before the march.
 The march dominates the runtime and scales as `n_cells × n_steps`, both of
-which you control. The read-out is server-side and free. The overall
+which are under direct control. The read-out is server-side and free. The overall
 economics are worth internalizing early: for a fixed grid, doubling
 `total_time` doubles cost but adds spectral resolution `δf ≈ 1/total_time`
 and ring-down fidelity; halving `dx` costs roughly 16× but quadruples
-field accuracy. Deciding which resource your observable actually needs is
+field accuracy. Deciding which resource the observable actually needs is
 most of the craft in setting up FDTD simulations.
 
 The rest of the tutorials walk each

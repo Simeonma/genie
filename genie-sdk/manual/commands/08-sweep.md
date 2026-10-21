@@ -11,8 +11,7 @@
 Expands the SweepSpec against the base configuration at the call site:
 `SweepSpec` validation plus `validate_sweep_config` (axis-name check,
 expansion, per-point re-resolution). An invalid spec raises
-`SweepExpandError` **locally** at the call point (the retired server-side
-422 surface, error messages unchanged). A valid call returns a
+`SweepExpandError` **locally** at the call point. A valid call returns a
 `SweepHandle` with the per-point **resolved** configurations ready to
 submit — nothing has been sent yet.
 
@@ -28,8 +27,8 @@ submit — nothing has been sent yet.
 
 **Local expansion constraints** (`SweepExpandError` at the `f.sweep()`
 call point): at most 32 axes; at most 512 expanded points by default
-(over-limit rejected with the count and the cap; deploy-configurable via
-the `FDTD_MAX_SWEEP_POINTS` environment variable); `zip` axes of equal
+(a server-side cap; over-limit rejected with the count and the cap);
+`zip` axes of equal
 length; every axis `name` must exist in the base `parameters` key set
 (else the error lists the available names). `linspace`/`logspace` take
 `[start, stop, n]` with `n ≥ 2` and `start != stop`; `logspace`
@@ -37,7 +36,7 @@ interprets the bounds as exponents of 10.
 
 ```python
 f.parameters({'pitch': 180e-9})
-# …chain configuration; dx etc. use {pitch} expressions…
+# …chain configuration; dx etc. use bare-name pitch expressions…
 h = f.sweep(parameters=[
     {"name": "pitch", "linspace": [140e-9, 240e-9, 6]},
 ], max_parallel=2)
@@ -47,24 +46,21 @@ h.wait(progress=True)
 ### Submission semantics (sliding window)
 
 Points are submitted as ordinary jobs, one per point, through a sliding
-window: at most `min(max_parallel, quota.max_concurrent_runs)` jobs are
-kept in flight, and each finished point frees a slot for the next
-pending one. The quota is read from the gateway `/whoami` response
-(fallback window of 2 when the quota is unavailable). The window is a
-politeness measure only — the server-side gates (429 / admission)
-remain authoritative.
+window: at most `max_parallel` jobs are kept in flight, and each finished
+point frees a slot for the next pending one. The window is a politeness
+measure only — server-side admission remains authoritative.
 
 ## SweepHandle
 
-Handle-side state machine (state names shared with the retired
-server-side parent states):
+Handle-side state machine (state names retained for downstream
+compatibility):
 `pending → running → done | canceled | failed` — `failed` only when
 **every** point ended bad (failed/killed/canceled); any success →
 `done`.
 
 | Attribute | Type | Description |
 |---|---|---|
-| `h.id` | str | Local sweep id `"sw-" + random`; no parent job exists on the server |
+| `h.id` | str | A local sweep id
 | `h.state` | str | Handle state: `pending` / `running` / `done` / `canceled` / `failed` |
 | `h.points` | list[dict] | Per-point **resolved configurations** (what each child job was or will be submitted with) |
 | `h.axis_names` | list[str] | Axis parameter names, in spec order |
@@ -82,9 +78,9 @@ server-side parent states):
 | `aggregate()` | **Local** aggregation as a plain column dict (see below) — not npz bytes, not an HTTP fetch; never 404/410 |
 | `download(dir)` | Lands exactly two files into `dir`: `manifest.json` (verbatim `status()` output) and `aggregate.npz`. No `pNNNN/` per-point directories — each point is an ordinary job; per-point full results are fetched through the ordinary results surface after `genie.connect()` |
 
-`on_failure="abort"` semantics: the first point seen `failed` (with no
-point yet `succeeded`) triggers automatic cancellation of the remaining
-points.
+`on_failure="abort"` semantics: only a point that ends `failed` triggers
+automatic cancellation of the remaining points; a `killed` point does
+not.
 
 ### Aggregate column contract
 
@@ -100,20 +96,15 @@ per-point digests; the column names are a consumed contract
   lists by index, e.g. `pt_monitors.0.comps.Ex.abs_max`. Boolean leaves
   are skipped.
 - Missing keys and failed/canceled points fill with `NaN`.
-- Metadata columns: `_axes` (JSON mapping column → axis name) and
-  `_skipped_keys` (JSON list of non-numeric skipped keys).
+- Metadata columns: `_axes` (a JSON list of `{column, name}` entries)
+  and `_skipped_keys` (JSON list of non-numeric skipped keys).
 
 **Common pitfalls**
 
-- Expecting `status()` to hit the network — it is a pure local
-  assembly over the last-refresh snapshot; call `wait()` / `pump()`
-  first when fresh in-flight states are needed.
 - Calling old-surface methods — `manifest()`, `.result(idx)`,
   `child_id(idx)` and per-point `pNNNN/` downloads do not exist on the
   current handle; per-point results come from the child jobs (ordinary
   jobs) through the ordinary results surface.
-- Giving both `sweep` and `parameters` — a hard `ValueError`; the two
-  forms are strictly exclusive.
 - Taking the `f` after `f.run()`, tweaking parameters, and sweeping —
   the `config` default pulls `to_config()`, i.e. the **current**
   configuration, which is locked after a run; don't run before
@@ -121,6 +112,3 @@ per-point digests; the column names are a consumed contract
 - Assuming one failed point means total failure — under
   `on_failure="continue"` (default) the remaining points run anyway;
   check the `rollup` breakdown.
-- Treating the parallel window as a guarantee — the sliding window only
-  limits how many jobs the client keeps in flight; server-side
-  admission and 429 throttling remain authoritative.

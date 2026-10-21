@@ -30,7 +30,7 @@ fr.fields                      # {field name: ndarray}
 ## The three Result objects
 
 Shared surface: `.comps` (component list), `.keys()` (all data keys),
-`.dict()` → `{key: np.ndarray}` for your own post-processing.
+`.dict()` → `{key: np.ndarray}` for custom post-processing.
 
 | Class | From | Extra attributes |
 |---|---|---|
@@ -42,7 +42,8 @@ Shared surface: `.comps` (component list), `.keys()` (all data keys),
 
 Returns: `SimData`, a wrapper over the h5 file. The grouped view it
 exposes (`data.tr.Ex` — see below) is a convenience surface; the
-underlying file layout is the **flat key protocol** defined here. Prefers the file run() saved locally, otherwise
+underlying file layout follows the flat-key protocol described in
+[The h5 key protocol](#the-h5-key-protocol) below. Prefers the file run() saved locally, otherwise
 fetches on the spot; `job_id` omitted = this instance's latest job (any
 historical job can be revisited).
 
@@ -65,12 +66,12 @@ data.plot("tr", "Ey", ax=ax)         # overlay
 ```
 
 `data.plot(mon, field, ax=None)` returns a matplotlib Axes (optional
-dependency — install `genie[plot]`); for volume monitors it plots the
+dependency — install `genie-sdk[plot]`); for volume monitors it plots the
 peak grid point curve by default.
 
 **Common pitfalls**
 
-- Slice lazy h5py reads whenever you can (`data.tr.Ex[:, 0]`) instead of
+- Slice lazy h5py reads wherever possible (`data.tr.Ex[:, 0]`) instead of
   pulling the full array first.
 - Comparing result files across parameter sweeps — use `digest()` (see
   page 07).
@@ -79,7 +80,7 @@ See also　Monitor definitions: [Monitors](#f-mon-monitors); auto-save paths: [f
 
 ## The h5 key protocol
 
-Source of truth: `genie-sdk/core/results.py`. On disk the result file
+On disk the result file
 uses **flat keys** — `<prefix>@<monitor>.<field>` — not nested groups:
 
 | Prefix | Keys | Meaning |
@@ -102,7 +103,7 @@ coordinate array and reshape: the unique counts give the grid
 dimensions. Sanity anchors from a real run: vacuum n = 1.0000, SiO₂
 n = 1.449 = √2.10.
 
-**Axis-order pitfall (downstream incidents).** The packed eps cube is
+**Axis-order pitfall (a common mistake).** The packed eps cube is
 laid out in `(z, y, x)` order while the coordinate arrays are listed
 as `x, y, z`. A reshape that assumes the coordinate order silently
 transposes the structure — a correct build then *reads back as
@@ -110,8 +111,6 @@ wrong*, which is worse than a crash. Avoid by querying cells by
 nearest-neighbor coordinate lookup, or by pinning the axis order
 explicitly before any reshape.
 
-**Time vs freq consistency (measured).** On a healthy run, the FFT of
-the time monitor and the freq monitor agree: spectral peak 300.04 vs
-299.25 THz (< 1%), amplitude difference < 0.1%. If the two paths
-disagree beyond that, suspect the monitor configuration first
-(sampling window, position mismatch), not the solver.
+**Time vs freq consistency.** On a healthy run the two routes agree to
+within ~1%; a larger discrepancy points at monitor configuration
+(sampling window, position mismatch) first, not the solver.

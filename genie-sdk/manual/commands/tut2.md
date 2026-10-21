@@ -4,7 +4,7 @@
 > as six namespaces on one object `f`. This page maps each namespace to the
 > mathematical role it plays in the discretized problem.
 
-The value of this mapping is that it tells you where to look when a result
+The value of this mapping is that it indicates where to look when a result
 is wrong. A spectrum that is off in magnitude is a `f.mat` or `f.geom`
 problem; a spectrum with spurious ripples is usually a `f.domain` problem
 (reflections, truncated ring-down); a completely wrong interference
@@ -17,13 +17,14 @@ single configuration object the server receives.
 
 ## The computational problem
 
-You want to solve Maxwell's equations in a finite volume `Ω` for time
+The computational problem is to solve Maxwell's equations in a finite
+volume `Ω` for time
 `[0, T]`, given:
 
 - a permittivity/permeability distribution `ε(r), μ(r)` — **the structure**;
 - an excitation `J(r, t)` — **the source**;
 - boundary conditions on `∂Ω` — **what happens at the edges**;
-- and you want to measure some fields — **the monitors**.
+- and some fields are to be measured — **the monitors**.
 
 The six namespaces are a one-to-one map of these inputs:
 
@@ -45,16 +46,16 @@ approximated, only the accuracy and cost of the approximation. In
 contrast, `f.domain`, `f.mat`, `f.geom`, and `f.src` define the problem
 itself, and errors in them produce a correctly-solved simulation of the
 wrong physics. That distinction — model errors versus discretization
-errors — is the most useful diagnostic habit this table buys you.
+errors — is the most useful diagnostic habit this table provides.
 
 The one-object design is also what makes sweeps and session editing cheap.
 Because every ingredient hangs off `f`, a parameter scan is a loop that
 mutates one field and resubmits, and the studio GUI's forms, tree, and 3D
 view are all read-only projections of the same object. There is no second
 place where the geometry lives and no sync step that can fall behind: the
-config you build in a script, the config the forms edit, and the config
+config built in a script, the config the forms edit, and the config
 the server rasterizes are one serialized SimConfig JSON at every point in
-its life. When in doubt about what the server will receive, that JSON is
+its life. Whenever there is doubt about what the server will receive, that JSON is
 the thing to inspect, and `f` is the only thing that produces it.
 
 ## How ε(r) is assembled
@@ -108,7 +109,7 @@ touches `f.geom` alone; a contrast scan that varies index touches
 registry is named rather than inlined.
 
 Order of operations in the config is irrelevant to `ε(r)` — only
-`priority` matters — so you can register materials and place shapes in any
+`priority` matters — so materials can be registered and shapes placed in any
 order before `f.run()`.
 
 ## When is anything checked?
@@ -118,14 +119,14 @@ with a misspelled field fails immediately, but values are only checked in
 bulk). Full validation — types, ranges, physical guards like `ε > 0` —
 happens once, at the **submission boundary** inside `f.run()`. Errors come
 back as `GenieConfigError` with a precise path. This design means partial
-configurations are fine to hold in `f` while you build them up.
+configurations are fine to hold in `f` while they are built up.
 
 The design choice is deliberate. A builder-style API that validated each
 statement would reject transiently inconsistent states that are perfectly
 legal intermediate steps — for example, a geometry box that references a
-material name you have not registered yet, registered two lines later.
-Deferring validation to the submission boundary lets you construct the
-config in whatever order is natural, at the cost that mistakes surface
+material name not yet registered, registered two lines later.
+Deferring validation to the submission boundary allows the config to be constructed
+in whatever order is natural, at the cost that mistakes surface
 late. The practical discipline is to validate the finished object early
 and cheaply: calling `f.run()` on a deliberately truncated domain costs a
 few seconds and exercises the entire validation path, so a config that
@@ -180,21 +181,21 @@ f.run()              # submit → queue → GPU build → march to total_time �
 `run()` is synchronous: it serializes `f` to a SimConfig JSON, validates,
 POSTs, then polls until the job reaches a terminal state
 (`defined → built → running → done`). On success the result file is
-auto-downloaded next to your script. See
+auto-downloaded next to the calling script. See
 [07 · f — submit & lifecycle](07-run.html) for `cancel`,
 `timeout_s`, and multi-GPU options.
 
 The state machine is worth knowing because each transition is a distinct
 failure surface. `defined` means the config passed validation and is
 queued; a stall here is load, not physics. `built` means `ε(r)` was
-rasterized on the server and the job holds GPU memory; geometry errors you
-somehow validated past show up here. `running` is the leapfrog march, and
+rasterized on the server and the job holds GPU memory; geometry errors
+that slipped past validation show up here. `running` is the leapfrog march, and
 `done` means monitors flushed and the result file is on its way back. The
 call blocks for the whole sequence, which makes quick iteration a matter
 of keeping runs small: the Quickstart's 2000 steps on a
 267 × 67 × 67 cell grid (`4 × 2 × 2 μm` at 15/30/30 nm) is about
 1.2×10⁶ cells × 2000 steps ≈ 2.4×10⁹ cell-updates, seconds of GPU time.
-Budget your experiments against that number and you will rarely wait.
+Budgeting experiments against that number keeps waits rare.
 
 ## Continue
 

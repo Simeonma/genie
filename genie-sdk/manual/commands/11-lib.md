@@ -1,7 +1,7 @@
 # 11 · genie.lib — parametric device library
 
 > One-shot wrappers for common structures: one call generates a whole set
-> of geometry nodes. Pass your current Simulation instance as `f`;
+> of geometry nodes. Pass the current Simulation instance as `f`;
 > materials must be **registered first** (the preflight check rejects any
 > reference to an undefined material at submission).
 
@@ -14,7 +14,7 @@ outside (0,1) or `n < 1` → immediate ValueError.
 | Param | Type | Required | Default | Description |
 |---|---|---|---|---|
 | `material` | str | yes | — | Name of a registered material |
-| `x_range` | (m, m) | yes | — | Start and nominal end (`pitch * n` should ≈ end − start; a leftover half-period is your physical call) |
+| `x_range` | (m, m) | yes | — | Start and nominal end (`pitch * n` should ≈ end − start; a leftover half-period is a modeling choice) |
 | `y_range` / `z_range` | (m, m) | yes | — | Cross-section extent of the lines (identical for all) |
 | `n` | int | yes | — | Number of periods (lines, ≥ 1) |
 | `pitch` | float, m | yes | — | Period |

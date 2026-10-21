@@ -8,7 +8,7 @@
 
 ### How do I connect to the service?
 
-`genie.connect()` reads `GENIE_URL`/`GENIE_API_KEY` from the environment, or take them explicitly (`https://genie.example.com` for remote SDK, `http://127.0.0.1:8777` for Studio debugging). Missing both URL sources errors at the HTTP layer — see [00 · Connections](00-connect.html).
+Two rails: a bare `genie.connect()` rides the local session (zero credentials held by the script), while explicit arguments or `GENIE_URL`/`GENIE_API_KEY` in the environment open a direct connection for self-contained scripts. On an unconfigured machine the bare call raises `GenieConfigError` pointing at `genie login` — see [00 · Connections](00-connect.html).
 
 ```python
 import genie
@@ -21,7 +21,7 @@ A `Simulation` can only be submitted **once** — after `f.run()` the configurat
 
 ### Why are my lengths wrong by orders of magnitude?
 
-The whole SDK is SI — meters, Hz, seconds. `f.mesh.dx = 25` (nm intended) makes the domain far smaller than the grid, and `fit_range` in nm errors the fit. Write `25e-9` — see [02 · Mesh](02-mesh.html).
+The SDK is SI throughout (meters, Hz, seconds), so `f.mesh.dx = 25` is meters, not nm — write `25e-9`; mechanisms and diagnostics in [Troubleshooting](troubleshooting.html).
 
 ### How do I check my geometry before running?
 
@@ -31,7 +31,7 @@ Add an index monitor (`f.mon.add_index().name('ix').field('both')`) — it retur
 
 ### What does `cfl` change?
 
-`f.domain.cfl` (default 0.9) scales the time step relative to the 3D stability limit: `Δt = cfl × Δt_max`. You normally never touch it; lowering it buys stability margin at the cost of more steps for the same `total_time` — see [01 · Domain](01-domain.html) and [Tutorial 1](tut1.html).
+`f.domain.cfl` (default 0.9) scales the time step relative to the 3D stability limit: `Δt = cfl × Δt_max`. It is normally left untouched; lowering it buys stability margin at the cost of more steps for the same `total_time` — see [01 · Domain](01-domain.html) and [Tutorial 1](tut1.html).
 
 ### How fine should my grid be?
 
@@ -39,11 +39,11 @@ At least ~10 cells per wavelength in the highest-index material (`dx ≈ λ/(10�
 
 ### Why was my refine region rejected or useless?
 
-`factor` has integer semantics — `1.5` is truncated to 1, i.e. no refinement at all; pass integers ≥ 2. Don't place the region flush against the domain edge: refining inside the PML wastes cells; leave 2–3 transition layers — see [02 · Mesh](02-mesh.html).
+The SDK chain API silently truncates a non-integer factor (2.5→2); always pass int — `1.5` becomes 1, i.e. no refinement at all, so pass integers ≥ 2. A region flush against the domain edge wastes cells refining inside the PML; leave 2–3 transition layers — see [02 · Mesh](02-mesh.html).
 
 ### Why is my oblique periodic simulation giving wrong physics?
 
-`periodic` is valid only for **normal incidence**. Oblique incidence on a repeating structure needs `bloch` (with `k`, or `from_source=True`), otherwise the interference is silently wrong — the most common boundary mistake in metasurface work. See [Tutorial 3](tut3.html) and [01 · Domain](01-domain.html).
+`periodic` is valid only for **normal incidence**; oblique incidence on a repeating structure needs `bloch` boundaries — mechanisms and diagnostics in [Troubleshooting](troubleshooting.html).
 
 ```python
 f.domain.boundary_condition('x_min', 'bloch', from_source=True)
@@ -51,13 +51,13 @@ f.domain.boundary_condition('x_min', 'bloch', from_source=True)
 
 ### How long should `total_time` be?
 
-Long enough that your observable has happened: a resonance of quality factor Q at f₀ needs `total_time ≳ Q/(π·f₀)` to ring down, and spectral resolution is `Δf ≈ 1/total_time`. Check with a time monitor that fields have decayed at the end. See [Tutorial 3](tut3.html) and [Tutorial 6](tut6.html).
+Long enough that the observable has happened: a resonance of quality factor Q at f₀ needs `total_time ≳ Q/(π·f₀)` to ring down, and spectral resolution is `Δf ≈ 1/total_time`. A time monitor should confirm that fields have decayed at the end. See [Tutorial 3](tut3.html) and [Tutorial 6](tut6.html).
 
 ## Sources
 
 ### How do I choose the source bandwidth?
 
-The Gaussian pulse's `bandwidth` (Hz) sets which spectrum is excited: it resolves features coarser than roughly `bw`, and by time–bandwidth duality the pulse lasts `~1/bw` — wide bandwidth = short pulse = short simulation. A 120 THz bandwidth pulse is ~3.7 fs FWHM. See [05 · Sources](05-src.html) and [Tutorial 5](tut5.html).
+The Gaussian pulse's `bandwidth` (Hz) sets which spectrum is excited: it resolves features coarser than roughly `bw`, and by time–bandwidth duality the pulse lasts `~1/bw` — wide bandwidth = short pulse = short simulation. With the σ = 0.5/bw convention a 120 THz bandwidth pulse has a ≈9.8 fs FWHM. See [05 · Sources](05-src.html) and [Tutorial 5](tut5.html).
 
 ```python
 f.src.add_plane_wave().freq(300e12).bandwidth(60e12).from_face('z_min')
@@ -65,7 +65,7 @@ f.src.add_plane_wave().freq(300e12).bandwidth(60e12).from_face('z_min')
 
 ### How should I set the plane-wave incidence angle?
 
-Prefer `.from_face('x_min' …)` — normal incidence, simplest and most reliable. For oblique incidence set `theta`/`phi` (don't combine with `from_face`, which is sugar for normal incidence), and use `bloch` boundaries with a matching `size` window. See [05 · Sources](05-src.html).
+Prefer `.from_face('x_min' …)` — normal incidence, simplest and most reliable. For oblique incidence set `theta`/`phi` (`from_face` is not combined with them, being sugar for normal incidence), and use `bloch` boundaries with a matching `size` window. See [05 · Sources](05-src.html).
 
 ### For a Gaussian beam, what does `radius` mean?
 
@@ -73,7 +73,7 @@ It is the **aperture radius** on the source plane, not the beam width: the 1/e²
 
 ### Why do my monitors near the source show garbage?
 
-Inside the TFSF source window (or just at the source plane) monitors mix incident + scattered fields; keep monitors a few cells away, face monitors between structure and PML. Never place a monitor inside the PML — those fields have no physical meaning. See [05 · Sources](05-src.html) and [Tutorial 6](tut6.html).
+Monitors a few cells from the source plane record incident + scattered fields coherently mixed, and inside the PML fields have no physical meaning — mechanisms and diagnostics in [Troubleshooting](troubleshooting.html).
 
 ## Monitors & results
 
@@ -88,11 +88,11 @@ f.mon.add_freq().name('tr').center(0, 0, 500e-9).size(1e-6, 1e-6, 0) \
 
 ### Why is my transmission not between 0 and 1?
 
-Raw `|Ẽ|²` is not transmission — it must be normalized by the incident flux. Only server-computed numbers in `f.digest()` marked `normalized=true` are physical T, and only for **plane** monitors (point monitors have no area integral and carry no T). If R+T+A > 1, suspect a too-small box or a truncated resonance. See [Tutorial 5](tut5.html) and [Tutorial 6](tut6.html).
+Raw `|Ẽ|²` is not transmission — only server-computed `f.digest()` numbers marked `normalized=true` on **plane** monitors are physical T; mechanisms and diagnostics in [Troubleshooting](troubleshooting.html).
 
 ### My spectrum has ringing/sidelobes around a sharp peak. Why?
 
-A finite record of length T convolves your spectrum with a sinc (−13.2 dB first sidelobe) — a truncated ring-down. Run longer (`total_time ≳ 3τ`) or apply `.apodize('both', …)` (Hann window, −31.5 dB sidelobes, at 2× resolution cost). See [Tutorial 5](tut5.html) and [06 · Monitors](06-mon.html).
+A finite record convolves the spectrum with a sinc — a truncated ring-down; run longer or apodize — mechanisms and diagnostics in [Troubleshooting](troubleshooting.html).
 
 ### How do I read the results?
 
@@ -118,7 +118,7 @@ A negative constant ε is rejected at submission — it is nondispersive and num
 
 ### How do I express gain in a material?
 
-Not with negative damping — `gamma < 0` is rejected. The gain channel is a **negative oscillator strength** (`Δε < 0`, equivalently `ωp² < 0`), which the kernel accepts as a bounded pump model. See [Tutorial 4](tut4.html).
+Not with negative damping — `gamma < 0` is rejected. The gain channel is a **negative oscillator strength** (Δε < 0 on a Lorentz pole, equivalently ωp² < 0), which the kernel accepts as a bounded pump model. See [Tutorial 4](tut4.html).
 
 ### How do geometries decide which material wins where?
 
@@ -128,7 +128,7 @@ Shapes overlap by `priority` — larger wins; equal priority: later in list orde
 
 ### How do I scan a parameter without blocking?
 
-Put the quantity behind a named parameter (`f.parameters({'pitch': 180e-9})`, referenced as `'{pitch}'` in numeric slots), then `f.sweep(parameters=[{"name": "pitch", "linspace": [...]}])` returns a `SweepHandle` immediately. See [08 · Sweep](08-sweep.html).
+Put the quantity behind a named parameter (`f.parameters({'pitch': 180e-9})`, referenced as `'pitch'` in numeric slots), then `f.sweep(parameters=[{"name": "pitch", "linspace": [...]}])` returns a `SweepHandle` immediately. See [08 · Sweep](08-sweep.html).
 
 ```python
 h = f.sweep(parameters=[{"name": "pitch", "linspace": [140e-9, 240e-9, 6]}],
@@ -138,11 +138,11 @@ h.wait(progress=True)
 
 ### How do I scan two parameters together (zip)?
 
-Two ways: `mode="zip"` pairs axis points element-wise, or pass a fully-controlled `sweep` SweepSpec dict (which wins if both `sweep` and `parameters` are given). Default `mode="product"` scans the Cartesian product. See [08 · Sweep](08-sweep.html).
+Two ways: `mode="zip"` pairs axis points element-wise, or pass a fully-controlled `sweep` SweepSpec dict — `sweep` and `parameters` are mutually exclusive (giving both raises `ValueError`; pick one). Default `mode="product"` scans the Cartesian product. See [08 · Sweep](08-sweep.html).
 
 ### Why was my sweep point skipped / marked failed?
 
-Under the default `on_failure="continue"` the remaining points run anyway — check `h.rollup` for the `{succeeded, failed, canceled}` breakdown and `h.points()` per point; failed points return 409 from `h.result(idx)`. See [08 · Sweep](08-sweep.html).
+Under the default `on_failure="continue"` failed points become NaN rows and the rest run anyway — mechanisms and diagnostics in [Troubleshooting](troubleshooting.html).
 
 ### Why can't I sweep after `f.run()`?
 
@@ -150,7 +150,7 @@ The sweep's base config defaults to `to_config()` — the **current** configurat
 
 ### How do I rerun with a changed parameter?
 
-You cannot mutate a submitted instance. Either export `f.to_script()`, tweak the script, and run it on a fresh `genie.connect()`, or make the quantity a named parameter and use `f.sweep()` with a single-point axis. See [07 · Submit](07-run.html) and [08 · Sweep](08-sweep.html).
+A submitted instance cannot be mutated. Either export `f.to_script()`, tweak the script, and run it on a fresh `genie.connect()`, or make the quantity a named parameter and use `f.sweep()` with a single-point axis. See [07 · Submit](07-run.html) and [08 · Sweep](08-sweep.html).
 
 ## Units & expressions
 

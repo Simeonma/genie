@@ -8,8 +8,8 @@
 ## `f.parameters()`
 
 Sets/merges the **global parameter table** (`{name: value | expression
-string}`) — referenced by expression slots in any numeric config field and
-by sweep axes; repeated calls accumulate.
+string}`); repeated calls accumulate, and sweep axes can only vary
+**parameter names** (see page 08).
 
 ```python
 f.parameters({'d': 1e-6, 'gap': 'd / 10'})
@@ -17,12 +17,8 @@ f.mesh.dx = 'd / 40'          # expression slot: evaluated server-side
 f.geom.add_box().name('core').x_range(0, 'd')
 ```
 
-**Common pitfalls**
-
-- Referencing an undefined parameter inside an expression string — the
-  submission-boundary precheck rejects it outright (GenieConfigError, with
-  kind/msg); nothing is evaluated locally.
-- Expecting a sweep to change the `dx` literal — sweep axes can only vary **parameter names** (see page 08).
+Expression syntax and evaluation rules are defined authoritatively in
+[12 · parameters](12-parameters.html).
 
 ## `f.run()`
 
@@ -60,7 +56,8 @@ f.run(gpu=2, progress=print)                  # dual GPU + progress callback
 
 **Common pitfalls**
 
-- Passing `gpu/timeout_s` after submission → RuntimeError (the configuration is already sent); each instance submits at most once — to change the configuration, create a new `genie.connect()`. At submission the serialized configuration is frozen verbatim into the job's `payload.json`; there is no parameter-update-and-resume interface.
+- Passing `gpu/timeout_s` after submission → RuntimeError (the configuration is already sent); each instance submits at most once — to change the configuration, create a new `genie.connect()`. At submission the configuration is frozen
+verbatim; there is no parameter-update-and-resume interface.
 - Omitting `domain.total_time` → rejected before submission (it is the only definition of simulation length).
 - Job failure/kill → raises `GenieJobError` (`.state` lands on `failed`/`killed`). Besides `done`/`failed`/`killed`, historical jobs may report the terminal state `archived` (server-side archival of past jobs; the client's `TERMINAL_BAD` set includes it). Results exist only for successful terminal states: querying the results endpoint of a `failed`/`killed` job returns HTTP 409.
 
@@ -81,8 +78,9 @@ n_geometry, n_source, monitors, run, state, job_id}`. When the instance
 has been submitted, a `server_summary` block is attached containing
 (among others) `grid_shape` — the grid **including absorbing layers** —
 plus `dt` and `n_steps`. The reported `dt` can be cross-checked against
-the Courant bound, `dt ≈ cfl · dx / (C0 · √3)`; measured values agree
-with this relation to within 0.1%.
+the Courant bound, `dt ≈ cfl · dx / (C0 · √3)`; the kernel actually
+computes `dt = cfl / √(Σᵢ 1/dᵢ²)` in c = 1 units — the two forms agree
+for uniform `dx`.
 
 ## `f.digest()`
 
@@ -121,6 +119,6 @@ chained APIs (`f.domain` / `f.mat` / `f.geom` / `f.src` / `f.mon`) plus
   API** (session rollback / form channel only); its name and behavior are
   not guaranteed. Always rebuild via `to_script()` + a fresh `genie.connect()`.
 
-**See also**　[f.expert](#connections-entry) (ask / delegate to an expert surface)
-becomes available once the composition root is wired:
+**See also**　[f.expert](00-connect.html#00-connections-entry)
+(ask / delegate to an expert surface), once a session is connected:
 `f.expert.ask(...)` / `f.expert.delegate(cfg=...)`.

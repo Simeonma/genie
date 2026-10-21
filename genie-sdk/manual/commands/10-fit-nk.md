@@ -2,8 +2,8 @@
 
 > Three module-level functions. For day-to-day work prefer
 > [`f.mat.add_from_library`](#f-mat-materials-registry) (an automation wrapper over the same
-> workflow); reach for these directly only when you have your own n-k data
-> or need to fine-tune a fit.
+> workflow); reach for these directly only with custom n-k data
+> or when a fit needs fine-tuning.
 
 ## Model-selection ladder
 
@@ -22,10 +22,8 @@ Returns: dict `{converged, eps_inf, n_poles, poles, quality,
 material_node, warnings}` — `material_node` is a `lorentz` node that goes
 straight into a SimConfig (None = no usable node); for multi-component
 inputs everything except warnings is a dict keyed by component.
-Failure semantics differ by surface: over the HTTP interface a
-non-converged fit or `eps_inf ≤ 0` returns `material_node = null` plus
-the `warnings` list, while the SDK surface raises `ValueError` for the
-same conditions.
+An unusable fit (e.g. too few data points inside `fit_range`) raises
+`ValueError` with an actionable message.
 
 | Param | Type | Required | Default | Description |
 |---|---|---|---|---|
@@ -61,6 +59,10 @@ for p in res["material_node"]["poles"]:   # Drude and Lorentz poles alike
 window and the fitter trades background offset for in-band accuracy, and
 the resulting `eps_inf` can drop below 1 — an n < 1 effective background
 that tightens the CFL bound in ways the default `cfl` no longer covers.
+Mechanically, `eps_inf` < 1 raises the wave speed in the material above
+`c/√ε_max`, so the Courant stability limit on the time step tightens
+accordingly — a small `eps_inf` forces a much smaller `dt` or the run
+diverges.
 
 Measured chain (Au, default pole counts):
 

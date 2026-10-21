@@ -1,8 +1,8 @@
 # 5 · Sources and monitors
 
 > The source injects a known field; monitors record what the structure
-> does to it. Everything measurable in your simulation is decided by how
-> you pair these two. This page gives the time/frequency math and the
+> does to it. Everything measurable in a simulation is decided by how
+> these two are paired. This page gives the time/frequency math and the
 > practical pairing rules.
 
 A simulation result is only as meaningful as its excitation and its
@@ -12,8 +12,8 @@ narrowband run interrogates one frequency precisely, and no amount of
 post-processing can recover spectral detail the source never injected.
 The monitors determine what is recorded of that response, and their
 placement and sampling fix the ceiling on what the recorded data can
-tell you. Getting the pairing wrong produces simulations that run
-cleanly and finish quickly and answer a question you did not ask.
+tell. Getting the pairing wrong produces simulations that run
+cleanly and finish quickly and answer a question that was not asked.
 
 ## The source waveform
 
@@ -46,7 +46,7 @@ band does not sneak energy into distant resonances of the structure.
 
 The SDK parameters map as: `freq` = `f₀` (Hz), `bandwidth` = the Gaussian
 bandwidth parameter (Hz). One convention to know: `bandwidth` is **not
-itself the spectral FWHM** — it is the historical rate parameter, pinned
+itself the spectral FWHM (full width at half maximum)** — it is the historical rate parameter, pinned
 by the kernel as σ_t = 0.5/bw, giving effective widths of
 time-amplitude FWHM ≈ 1.18/bw, time-intensity FWHM ≈ 0.83/bw, and
 spectral-intensity FWHM ≈ 0.53·bw. A pulse with bandwidth `bw` resolves
@@ -54,11 +54,6 @@ spectral features coarser than roughly `bw` — and, by time-bandwidth
 duality, its duration is `~1/bw`, so **wide bandwidth = short pulse =
 short simulation**. `delay` shifts `t₀` (useful to let the pulse fully
 enter before hitting the structure), `phase` adds a constant phase.
-
-Specifying `bandwidth` fixes the pulse length — a 120 THz bandwidth
-pulse has `σ ≈ 4.2 fs` and an amplitude FWHM of ≈ 9.8 fs, and needs only
-tens of fs of runout; a 1 MHz-wide scan of a high-Q cavity cannot be
-driven by one pulse at all (see `Δf ≈ 1/total_time` below).
 
 **Worked numbers.** For `f₀ = 300 THz` and `bw = 120 THz`: with
 `σ = 0.5/bw`, the pulse duration is
@@ -69,16 +64,16 @@ describes, and its spectral-intensity FWHM is ≈ 64 THz centered on f₀
 (meaningful content spans roughly `f₀ ± bw/2`). This is
 the right source for broadband transmission through a photonic-crystal
 slab; it is the wrong source for a narrow filter, where 100 THz of
-spectrum is spent on frequencies you will never look at while the filter
+spectrum is spent on frequencies that are never inspected while the filter
 line itself receives only a few GHz of honest resolution.
 
 At the other extreme, consider a cavity measurement run for
-`T = 100 fs`. The achievable spectral resolution is `Δf = 1/T = 10 GHz`.
+`T = 100 fs`. The achievable spectral resolution is `Δf = 1/T = 10 THz`.
 A cavity with `Q = 10000` at 300 THz has a linewidth
-`f₀/Q = 30 MHz`, three orders of magnitude finer than the 10 GHz grid
-of frequencies your run can distinguish. The cavity's response exists in
-the data only as an unresolved spike on a coarse comb; you cannot report
-its Q, and even its center frequency is uncertain to the grid spacing.
+`f₀/Q = 30 MHz`, five orders of magnitude finer than the 10 THz grid
+of frequencies the run can distinguish. The cavity's response exists in
+the data only as an unresolved spike on a coarse comb; its Q cannot be
+reported, and even its center frequency is uncertain to the grid spacing.
 High-Q measurements are budgeted in total run time, not in source
 bandwidth, which is the central lesson of this page.
 
@@ -96,11 +91,11 @@ wave limit because the illumination is kilometers away relative to the
 device; a lens-coupled sensor needs the Gaussian beam because the
 focusing geometry is part of the physics; a waveguide ring resonator is
 fed through its port waveguide, and only a soft source inside that
-waveguide reproduces the mode-matched injection without modelling an
+waveguide reproduces the mode-matched injection without modeling an
 actual laser.
 
 The plane wave is a **total-field/scattered-field** source: fields inside
-its window follow the analytic incoming wave exactly; the structure
+its window follow a calibrated incident waveform; the structure
 scatters against it. Place it on a face with `from_face('z_min')`, or
 steer with `theta/phi` — for oblique incidence with periodic boundaries,
 the boundary must be `bloch` (see
@@ -111,7 +106,7 @@ even where a pure field-injection scheme would fail: the source surface
 imposes the known incoming wave, and everywhere else the solver evolves
 total fields, so the scattered field is obtained by subtraction against
 the analytic incident wave rather than by a second reference run. The
-practical consequence for you is that a plane wave simulation needs the
+practical consequence is that a plane wave simulation needs the
 source plane and the monitors to respect the TFSF geometry: monitors
 between source and structure measure incident plus scattered fields and
 are not transmission by themselves.
@@ -128,8 +123,8 @@ The Gaussian beam's `radius` is the **aperture radius** on the source
 plane: the 1/e² intensity beam width is `w ≈ 0.47·radius`.
 
 This distinction is a recurring source of factor-of-two confusion. If
-your experiment quotes a beam waist `w₀ = 2 μm`, you must set
-`radius ≈ 4.3 μm`, not 2 μm. Feeding the waist value directly produces a
+an experiment quotes a beam waist `w₀ = 2 μm`, `radius` must be set to
+≈ 4.3 μm, not 2 μm. Feeding the waist value directly produces a
 beam twice as broad as intended, and the mismatch is invisible in field
 plots: the beam still looks like a beam. Verify the actual profile once
 with a transverse field slice at the source plane, or by comparing the
@@ -145,7 +140,7 @@ accumulates, per requested frequency `fₖ`:
 Ẽ(fₖ) = Σₙ  E(tₙ) · w(tₙ) · e^{+i·2π·fₖ·tₙ} · Δt
 ```
 
-a discrete Fourier transform at exactly the `n` points you asked for via
+a discrete Fourier transform at exactly the `n` points requested via
 `.freq(center, bw, n)` — they linspace across `[center − bw/2, center +
 bw/2]`. Spectral resolution is limited by the simulated time:
 `Δf ≈ 1/total_time`, so a `Q = 1000` resonance at 300 THz needs ~5 ps of
@@ -156,14 +151,14 @@ The accumulated-complex-sum formulation is what makes broadband FDTD
 spectroscopy affordable: the time series is never stored, and each
 requested frequency costs one complex multiply-add per time step per
 field component. The corollary is that the frequency list is frozen when
-the simulation starts. Request the band you need generously (a few tens
+the simulation starts. The band should be requested generously (a few tens
 of points across the feature of interest is usually enough, since
 Lorentzian lines are smooth between samples), because there is no
 re-sampling later from the same run.
 
 Resolution and leakage are quantifiable. A finite record of length `T`
 is a rectangle window; its transform is a sinc with first sidelobe at
-**−13.2 dB** and first zero at `1/T` — that sinc convolves your spectrum
+**−13.2 dB** and first zero at `1/T` — that sinc convolves the spectrum
 and rings around sharp features. The Hann window (`apodize`) trades 2×
 main-lobe width for **−31.5 dB** sidelobes:
 
@@ -180,9 +175,9 @@ Trusted-band rule: the trustworthy content of a Gaussian-pulse run is
 `f₀ ± bandwidth/2`; outside that interval the spectrum shows only the
 pulse's roll-off, not physics.
 
-Apodization is worth its cost in numbers: measured on a reference run,
-the in-band spectral-shape deviation drops from 2.41% (unwindowed) to
-1.53% with `apodize`. A `width` set too narrow, however, throws the
+Apodization is worth its cost: measured on a reference run, it brings
+the in-band spectral-shape deviation from the percent level down to
+below the percent level. A `width` set too narrow, however, throws the
 window's own sidebands out of band and forfeits the benefit.
 
 The −13.2 dB number is worth memorizing because it sets the dynamic
@@ -191,8 +186,8 @@ peak mean that a weak feature sitting within a few `1/T` of a strong one
 is buried under the strong feature's ringing, and it will look like
 physics — ripples have structure and invite over-interpretation. When a
 spectrum shows a comb of ripples with spacing `1/T` around a sharp line,
-that comb is the rectangle window, not resonances; rerun with `apodize`
-before believing it.
+that comb is the rectangle window, not resonances; a rerun with
+`apodize` is warranted before it is treated as physics.
 
 Time monitors (`add_time`) store the raw series `E(tₙ)` — use them to see
 pulses, reflections, and to check that the field has actually decayed
@@ -209,12 +204,19 @@ sidelobes. Tutorial 6 turns this into a full checklist.
 ## Normalization, end to end
 
 Transmission and reflection are ratios, and the ratio is what removes
-the source from the measurement. The complete procedure uses two runs
-over the identical grid, sources, and monitor set: one with the
-structure, one with the structure removed (replaced by the background
-medium). The structure-less run's face monitor records the incident
-flux `P_inc(f)`, and the full run's monitor records `P(f)`; the
-physical transmission is `T(f) = P(f)/P_inc(f)`.
+the source from the measurement. The canonical power measurement is a
+**face monitor** behind the structure, with the same size as the
+incident beam, integrating the normal Poynting flux:
+
+```math
+P(f) = ½ ∫ Re{ E × H* } · n̂ dA        T(f) = P(f) / P_inc(f)
+```
+
+The complete procedure uses two runs over the identical grid, sources,
+and monitor set: one with the structure, one with the structure removed
+(replaced by the background medium). The structure-less run's face
+monitor records the incident flux `P_inc(f)`, and the full run's monitor
+records `P(f)`; the physical transmission is the ratio `T(f) = P(f)/P_inc(f)`.
 
 The division cancels more than the source spectrum. It also cancels the
 Gaussian window in the DFT kernel, the grid discretization error common
@@ -227,33 +229,23 @@ run is comparable to nothing.
 
 For **reflection**, with a TFSF plane wave, incident and scattered fields
 superpose linearly; the reflected amplitude is the scattered field on a
-face between source and structure. The incident reference can be
-obtained from the structure-less run's same face, since with nothing to
-reflect, its field there *is* the incident wave. Reflection from
-oblique or anisotropic problems may need the two polarization
-components separated before the flux ratio is taken.
+second face monitor placed between the source and the structure. The
+incident reference can be obtained from the structure-less run's same
+face, since with nothing to reflect, its field there *is* the incident
+wave. With `R` and `T` in hand, `R + T + A = 1` becomes the conservation
+check — if it fails, either the box is too small (light bypassing a
+monitor) or the run truncated a resonance. Reflection from oblique or
+anisotropic problems may need the two polarization components separated
+before the flux ratio is taken.
 
 In practice much of this is automated: the server computes reference
-fluxes and reports normalized transmission in `digest()` (face monitors
-only; point monitors have no area and report no `T`). Automation is not
-a substitute for understanding, though, because it is exactly the runs
-where the reference was invalid (wrong monitor size, structure
+fluxes and reports normalized transmission in `digest()` (the throughput
+numbers marked `normalized=true` are physical `T`; face monitors only —
+point monitors have no area integral and report no `T`). Automation is
+not a substitute for understanding, though, because it is exactly the
+runs where the reference was invalid (wrong monitor size, structure
 spilling out of the reference aperture) that automation faithfully
 propagates into a wrong but plausible-looking number.
-
-## Measuring transmission properly
-
-The canonical power measurement: a **face monitor** behind the structure,
-with the same size as the incident beam. The monitor integrates the
-normal Poynting flux:
-
-```math
-P(f) = ½ ∫ Re{ E × H* } · n̂ dA        T(f) = P_trans(f) / P_inc(f)
-```
-
-The server computes this in `digest()` — the throughput numbers marked
-`normalized=true` are physical `T`; point monitors have no area integral
-and report no `T`.
 
 "The same size as the incident beam" is doing real work in that sentence.
 A monitor smaller than the beam clips power and reads a low
@@ -261,34 +253,19 @@ transmission; a monitor larger than the beam is safe in principle but
 collects stray power that bypassed the structure through the boundaries,
 which reads high. The conservative choice is a monitor spanning the full
 cross-section of the domain for collimated problems, and a beam-sized
-monitor only once you have verified the scattered field outside the beam
-aperture is negligible.
-
-Write out both normalizations. For **transmission**, divide by
-the incident flux of the *same* simulation without the structure (or the
-server's reference), so source spectrum cancels:
-
-```math
-T(f) = |Σ A_trans(f)|² / |Σ A_ref(f)|²
-```
-
-For **reflection** with a TFSF plane wave, incident and scattered fields
-superpose linearly; the reflected amplitude is the scattered field on a
-face between source and structure, and `R + T + A = 1` becomes your
-conservation check — if it fails, either the box is too small (light
-bypassing a monitor) or the run truncated a resonance. For reflection, place a second face monitor between
-the source and the structure and decompose incident/scattered fields.
+monitor only once the scattered field outside the beam aperture has been
+verified negligible.
 
 The conservation check deserves promotion to habit. Absorption computed
 as `1 − R − T` is only as good as the flux collection, and a failing
 check is information about the simulation, not about the material: light
 escaping through the lateral boundaries, a monitor clipping a diffracted
 order, or a resonance still ringing at cutoff each produce a
-characteristic deficit. Treat a few percent of unexplained missing
-power as a bug to find, not a rounding error to wave past.
+characteristic deficit. A few percent of unexplained missing power is a
+bug to find, not a rounding error to wave past.
 
 ## Continue
 
 - Exact parameter tables: [05 · f.src](05-src.html),
   [06 · f.mon](06-mon.html)
-- Reading what you measured: [06 · Reading results](tut6.html)
+- Reading the results: [06 · Reading results](tut6.html)

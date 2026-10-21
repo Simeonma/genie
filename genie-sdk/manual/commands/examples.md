@@ -4,13 +4,13 @@
 > demonstrates and what to check in the output. All units are SI; the command surface
 > is exactly the one documented on pages 00–09 and 11 (plus `genie.lib`).
 
-## Grating coupler (baseline)
+## Grating coupler (baseline) — extras: none
 
 A uniform dielectric grating under a normally incident plane wave is the
 "hello world" of FDTD: periodic high-index teeth form a 1D photonic band
 structure, and the transmission spectrum shows band-edge ripples and
 suppression where the Bragg condition `2·(n_line·d + n_gap·(Λ − d)) = m·λ`
-is met inside the stack. You learn the full connect → domain → mesh → mat →
+is met inside the stack. It shows the full connect → domain → mesh → mat →
 geom → src → mon → run → get_freq loop, and how a period-`Λ` structure
 shapes a spectrum. The teeth are stamped by the `genie.lib.grating` helper
 (documented in [11 · genie.lib](11-lib.html))
@@ -44,7 +44,7 @@ grating(f, material='si',
         y_range=(-5e-7, 5e-7), z_range=(-1.1e-7, 1.1e-7),
         n=20, pitch=220e-9, duty=0.5)
 
-# 5 · source: plane wave from x_min, centered 200 THz (λ0 = 1.5 µm)
+# 5 · source: plane wave from x_min, centered 200 THz (λ₀ = 1.5 µm)
 f.src.add_plane_wave().freq(200e12).bandwidth(60e12) \
     .from_face('x_min').polarization(0, 0, 1).name('pw')
 
@@ -64,22 +64,27 @@ T = abs(fr.fields['Ez'])**2
 
 - Band-edge ripples: the first stopband-like dip sits near the Bragg wavelength
   `λ_B = 2·(n_eff·d + n_gap·(Λ − d))` — with n_eff ≈ √12.1 ≈ 3.48, d = Λ/2, expect it
-  deep in the IR, so inside the scan window you should see only Fabry–Pérot-style
+  deep in the IR, so inside the scan window only Fabry–Pérot-style
   fringes with period `Δf = c/(2·n_eff·L)`.
 - An index monitor (`f.mon.add_index().name('ix').field('eps')`) confirms all 20 teeth
   landed at the intended pitch before trusting the spectrum.
 - `f.digest()` reports transmittance min/max only when the monitor is a plane monitor
   with `normalized=true`; use it for quick tuning-round comparisons.
 
-## Ring resonator add-drop filter
+## Ring resonator add-drop filter — extras: none
 
 A microring side-coupled to a straight bus waveguide is the canonical Lorentzian
 resonator: light circulating in the ring interferes constructively only when the
 round-trip phase closes, i.e. at resonances `2πR·n_eff = m·λ`. On resonance the
 through port shows a dip (power is diverted) and the drop port shows a peak; the
-resonance spacing is the free spectral range `FSR = c/(2πR·n_g)`. You learn to
-combine two `genie.lib.ring` calls (bus slab + ring), use two frequency monitors,
+resonance spacing is the free spectral range `FSR = c/(2πR·n_g)`. The example
+shows how to combine two `genie.lib.ring` calls (bus slab + ring), use two frequency monitors,
 and read two-port spectra against a closed-form formula.
+
+Expected magnitude warning: plane-wave excitation of a 220 nm bus couples
+weakly — expect small through/dip contrast. The example demonstrates
+structure, not efficient excitation (a mode source or eigenmode injection
+would be the efficient route).
 
 ![Ring resonance](figs/ex-ring.svg)
 
@@ -147,13 +152,13 @@ T_drop = abs(dr.fields['Ez'])**2
   critical coupling at this grid resolution) or insufficient total time to resolve a
   narrow ring-down.
 
-## Distributed Bragg reflector
+## Distributed Bragg reflector — extras: none
 
 A DBR is a stack of alternating quarter-wave ε layers: partial reflections from each
 interface add in phase when the optical round trip per pair is half a wave,
 `n1·d1 + n2·d2 = λ/2`, giving a stopband centered at `λ = 2·(n1·d1 + n2·d2)/m`.
 Reflectivity grows with pair count N roughly as `R ∝ [(n1/n2)^(2N)]²` band-center.
-You learn the small `for` loop of `add_box` (one pass = one geometry node) and how a
+It shows the small `for` loop of `add_box` (one pass = one geometry node) and how a
 frequency monitor on the reflection side exposes the stopband directly.
 
 ![Bragg stopband](figs/ex-bragg.svg)
@@ -180,8 +185,8 @@ f.mesh.dz = 30e-9
 f.mat.add_const().name('h').eps(4.4)
 f.mat.add_const().name('l').eps(2.1)
 
-# 4 · geometry: 12 quarter-wave pairs centered at λ0 = 1.55 µm
-#     d1 = λ0/(4·n1) ≈ 185 nm, d2 = λ0/(4·n2) ≈ 267 nm
+# 4 · geometry: 12 quarter-wave pairs centered at λ₀ = 1.55 µm
+#     d1 = λ₀/(4·n1) ≈ 185 nm, d2 = λ₀/(4·n2) ≈ 267 nm
 D1, D2 = 185e-9, 267e-9
 x = -2.5e-6
 for i in range(12):
@@ -218,14 +223,14 @@ R = abs(fr.fields['Ex'])**2
   `Δf ≈ c/(2·n_avg·L)`; monitor placement a few cells away from the source plane keeps
   incident/scattered mixing out of the reading.
 
-## Dielectric metasurface unit cell (oblique Bloch)
+## Dielectric metasurface unit cell (oblique Bloch) — extras: none
 
 One disk per unit cell with Bloch-periodic transverse boundaries is the standard
 metasurface building block: the disk acts as a truncated waveguide mode with
 Mie-like electric/magnetic dipole resonances. Under oblique incidence the
-transverse phase advance is set by the Bloch wave vector, so you must use
+transverse phase advance is set by the Bloch wave vector, requiring
 `bloch` boundaries (never `periodic`) with `k = (2π/λ)·n·sin θ` on the in-plane
-faces, and set the plane-wave `theta` to match. You learn the `add_cylinder`
+faces, with the plane-wave `theta` set to match. It introduces the `add_cylinder`
 shape, `bloch` + `from_source` bookkeeping, and how transmission shifts with
 incidence angle.
 
@@ -287,17 +292,17 @@ T = abs(fr.fields['Ex'])**2 + abs(fr.fields['Ey'])**2
   momentum `k = (2π/λ)·n·sin θ` delivered to the bloch faces via `from_source=True`.
 - The resonance stays Lorentzian but weakens with tilt (dipole overlap drops); the
   transmission peak between dips is the leaky-mode background.
-- If you prefer explicit k instead of `from_source`, set
+- If explicit k is preferred instead of `from_source`, set
   `f.domain.boundary_condition('x_min', 'bloch', k=(2π/1.55e-6·sin θ, 0, 0))` and keep
   the source `theta` identical — a mismatch shows up as a wrong-periodicity spectral
   artifact.
 
-## Gold nanoparticle scattering
+## Gold nanoparticle scattering — extras: `genie-sdk[fit]`
 
 A sub-wavelength gold sphere in water supports a localized surface plasmon: the
 Drude-like ε(ω) of Au (fitted from the bundled n-k library) makes the polarizability
 `α = 4πR³(ε_m − ε_d)/(ε_m + 2ε_d)` resonate where `Re ε_m ≈ −2ε_d`, giving a strong
-dipole-like extinction peak near 530 nm in water (ε_d ≈ 1.77). You learn
+dipole-like extinction peak near 530 nm in water (ε_d ≈ 1.77). The example uses
 `add_from_library('Au')` — the library fit runs client-side and registers a pole
 material — plus the TFSF plane wave and how `digest()`/`get_freq` serve as a
 cross-section proxy.
@@ -331,7 +336,7 @@ f.geom.add_sphere().material('Au').center(0, 0, 0).radius(40e-9)
 f.geom.add_box().material('water') \
     .x_range(-6e-7, 6e-7).y_range(-6e-7, 6e-7).z_range(-6e-7, 6e-7).priority(-1)
 
-# 5 · source: plane wave from z_min, λ0 ≈ 532 nm
+# 5 · source: plane wave from z_min, λ₀ ≈ 532 nm
 f.src.add_plane_wave().freq(5.64e14).bandwidth(2e14) \
     .from_face('z_min').name('pw')
 

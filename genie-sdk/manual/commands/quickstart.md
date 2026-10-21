@@ -1,6 +1,6 @@
 # Quickstart
 
-> A complete guided-mode-free starter: one grating transmission simulation,
+> A complete no-wizard, copy-paste starter: one grating transmission simulation,
 > from `connect()` to a plot, in about 30 lines. Every step links to the
 > full reference.
 
@@ -8,11 +8,14 @@
 
 ```bash
 # GitHub direct (if raw.githubusercontent.com is reachable)
-pip install https://github.com/Simeonma/genie-sdk/raw/dist/dist/genie_sdk-<version>-py3-none-any.whl
+pip install https://github.com/Simeonma/genie-sdk/raw/dist/dist/genie_sdk-2.0.0a8-py3-none-any.whl
 
 # CDN mirror (recommended on CN networks): same wheel via jsDelivr
-pip install https://cdn.jsdelivr.net/gh/Simeonma/genie-sdk@dist/dist/genie_sdk-<version>-py3-none-any.whl
+pip install https://cdn.jsdelivr.net/gh/Simeonma/genie-sdk@dist/dist/genie_sdk-2.0.0a8-py3-none-any.whl
 ```
+
+The URLs above carry the current release filename; check the Releases page for
+the latest filename before installing a newer version.
 
 Distribution name `genie-sdk`; import name `genie` (`import genie`).
 
@@ -20,9 +23,19 @@ Version list: [Releases](https://github.com/Simeonma/genie-sdk/releases)
 (wheels also on the `dist` branch). Python ≥ 3.10;
 `requests / numpy / pydantic / h5py` install automatically.
 
-Optional extras: `genie[server]` local GUI (`genie studio`) ·
-`genie[agent]` MCP tool surface · `genie[fit]` material fitting (scipy) ·
-`genie[plot]` `SimData.plot` (matplotlib) · `genie[dev]` pytest.
+Optional extras: `genie-sdk[server]` local GUI (`genie studio`) ·
+`genie-sdk[agent]` MCP tool surface · `genie-sdk[fit]` material fitting (scipy) ·
+`genie-sdk[plot]` `SimData.plot` (matplotlib) · `genie-sdk[dev]` pytest.
+
+Where do the URL and credentials come from? The service address and the
+account come from whoever operates the GENIE deployment being used — there
+is no public signup.
+
+Post-install sanity check:
+
+```bash
+python -c "import genie; print(genie.__version__)"
+```
 
 ## The whole script
 
@@ -91,7 +104,7 @@ has been auto-downloaded. Three ways in:
 
 ```python
 fr = f.get_freq('tr')        # raw arrays: fr.freqs (Hz), fr.fields
-T  = abs(fr.fields['Ex'])**2 # do your own normalization/plotting
+T  = abs(fr.fields['Ex'])**2 # normalization/plotting is up to the analysis code
 
 data = f.results()           # full h5 view: data.tr.Ex, data.attrs
 data.plot('tr', 'Ex')        # quick matplotlib plot (optional dependency)
@@ -127,6 +140,9 @@ larger `Δf` (~120 THz for 100 nm) — check `bandwidth`/monitor spans in
 frequency, not just in nanometers.
 
 ## Where to go next
+
+Pages 00–12 are lookup reference, not sequential reading — follow the step
+table above and jump to a page as needed.
 
 - Parameterize the pitch and scan it: [08 · sweep](08-sweep.html)
 - Metals and dispersion: [03 · f.mat](03-mat.html)

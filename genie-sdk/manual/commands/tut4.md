@@ -52,11 +52,11 @@ D(t) = ε₀·ε·E(t)
 ```
 
 Physically this describes the limit in which all bound-charge resonances
-of the medium sit far above the frequencies you simulate, so within your
+of the medium sit far above the frequencies being simulated, so within the
 band the susceptibility looks flat. Glass at visible frequencies is the
 textbook case: the electronic resonance of silica lies in the deep UV,
 and across 400–700 nm the refractive index varies by only a few percent.
-Whenever your band is narrow relative to the nearest resonance, a
+Whenever the band is narrow relative to the nearest resonance, a
 constant ε is both cheaper and more stable than a fitted dispersion.
 
 `f.mat.add_const()` takes `eps` (and optionally `mu`), each as a scalar
@@ -83,15 +83,17 @@ A bound-charge resonance — damped harmonic oscillator per unit volume —
 contributes to the relative permittivity:
 
 ```math
-ε(ω) = ε∞ + Σⱼ  Δεⱼ · ω₀ⱼ² / (ω₀ⱼ² − ω² + i·γⱼ·ω)
+ε(ω) = ε∞ + Σⱼ  Δεⱼ · ω₀ⱼ² / (ω₀ⱼ² − ω² − i·γⱼ·ω)
 ```
+
+(written in the `e^{−iωt}` convention used throughout this page).
 
 Each pole is a small physical system: a charge bound to an equilibrium
 position, driven by the field, losing energy at rate γ. Below the
 resonance the charge can follow the field and the contribution to ε is
 positive; above it the charge cannot keep up, the sign of the response
 reverses, and ε dips. The `ε∞` term collects everything faster than the
-modelled poles: high-energy resonances that matter only as a
+modeled poles: high-energy resonances that matter only as a
 frequency-independent background offset.
 
 with three parameters per pole, all in `f.mat.add_lorentz()`:
@@ -148,13 +150,13 @@ fewest poles the band demands.
 **Worked numbers.** Take a gold-like metal at the green edge of the
 visible, λ = 550 nm. The angular frequency is
 `ω = 2πc/λ = 2π·(3×10⁸)/(550×10⁻⁹) ≈ 3.4×10¹⁵ rad/s`. Handbooks quote
-Re ε ≈ −5 at this wavelength. That single number tells you the free
+Re ε ≈ −5 at this wavelength. That single number says the free
 electrons are screening strongly: the displacement current through the
 medium nearly cancels the vacuum displacement current, the field is
 expelled, and the material behaves optically as a metal rather than a
 lossy dielectric; a constant-ε model is out of the question and a pole
 model is mandatory. To reproduce Im ε over a 100 THz window around this
-frequency you typically need the Drude term plus two to four Lorentz
+frequency the fit typically needs the Drude term plus two to four Lorentz
 poles: Drude owns the broad screening background and each Lorentz pole
 covers one interband feature. One pole alone bends ε too slowly to track
 the steep rise of Im ε near interband thresholds and the slow Drude tail
@@ -196,15 +198,15 @@ dp/dt = −γ·p − q·E(t),   P = N·q·x = N·p/q  ⇒  χ(ω) = −ω_p²/(�
 with `ω_p² = Nq²/(mε₀)` the plasma frequency. The sign is the giveaway:
 Drude contributes **negative** Re ε below `ω_p` — the screening that
 makes metals reflective. Note that both derivations share the static
-strength identity `ω_p² = Δε·ω₀²`; that is exactly the rank-1 relation
-the kernel applies (`lorentz ωp² = Δε·ω₀²`), so a rank-1 pole is stored
-once and expanded consistently.
+strength identity `ω_p² = Δε·ω₀²`; that identity is the kernel's uniform
+Lorentz storage convention (a lorentz pole stores `ωp² = Δε·ω₀²`), so
+each pole is stored once and expanded consistently.
 
 ## The sign convention
 
 - **γ < 0 is rejected.** Negative damping is not gain — the gain channel
-  is a *negative oscillator strength* (Δε < 0, equivalently ωp² < 0),
-  which the kernel accepts as a bounded, stable pump model.
+  is a *negative oscillator strength* (Δε < 0 on a Lorentz pole,
+  equivalently ωp² < 0), which the kernel accepts as a bounded, stable pump model.
 - **ω₀ = 0 is Drude's job.** A Lorentz pole with ω₀ = 0 is rejected.
 
 The reasoning behind the first guard is subtle enough to state plainly.
@@ -225,7 +227,7 @@ same numbers) or **rank-1**: supply `alpha=[x,y,z]` (and optionally
 giving
 
 ```math
-ε(ω) = ε∞·I + Δε·ω₀²/(ω₀² − ω² + iγ·ω) · α̂β̂ᵀ
+ε(ω) = ε∞·I + Δε·ω₀²/(ω₀² − ω² − iγ·ω) · α̂β̂ᵀ
 ```
 
 The rank-1 form describes media whose resonances respond to one field
@@ -242,40 +244,38 @@ rejected. Axis-independent parameters = stack several poles.
 
 ## Getting real material data as poles
 
-You rarely fit poles by hand. `f.mat.add_from_library('Au', …)` loads
-bundled n-k data, fits `ε∞ + poles` on the client (same results as the
-old service-side fitter, golden-locked to relative 1e-9), and registers
+Fitting poles by hand is rarely necessary. `f.mat.add_from_library('Au', …)` loads
+bundled n-k data, fits `ε∞ + poles` on the client (identical to the server-side fit),
+and registers
 the lorentz node — see [10 · genie.material](10-fit-nk.html) for
-`fit_range`, pole-count trade-offs, and fitting your own data. The
-legacy spelling — a bare `from_library` node in the config — is rejected
-by the kernel; the error message carries three migration pointers
-(library + fit_nk + add_from_library) to route old configs onto the
-client-side fit.
+`fit_range`, pole-count trade-offs, and fitting custom measurement data. A bare
+`from_library` node in the config is rejected; the error message lists
+the supported routes.
 
 The workflow exists because handbook data arrives as tables of n and k,
 never as poles, and the conversion is a nonlinear least-squares problem
 with real trade-offs: more poles always lower the residual and always
 raise the simulation cost, and the improvement concentrates at the
 sharpest spectral feature. The practical strategy is to set `fit_range`
-to the band your sources and monitors actually occupy and judge the fit
+to the band the sources and monitors actually occupy and judge the fit
 only inside it, because a pole model is a contract for a frequency
 range, not a global theory of the material.
 
-## Checking a material model before you trust it
+## Checking a material model before trusting it
 
 Three checks, in increasing order of effort, catch nearly every bad
-material model before it costs you a simulation campaign. First, plot
-the model: reconstruct ε(ω) from `ε∞` and the fitted poles over your
+material model before it costs a simulation campaign. First, plot
+the model: reconstruct ε(ω) from `ε∞` and the fitted poles over the
 band, on a dense frequency grid, and compare Re ε against the tabulated
-Re ε and Im ε against `2ωk/c` from the n-k table (since `Im ε = 2nk`).
+Re ε and Im ε against the tabulated 2nk (since `Im ε = 2nk`).
 This plot exposes the two standard failure modes at a glance: a fit that
 misses Im ε badly around an interband edge means too few poles for the
 sharpness, and a fit that wiggles between data points means the fitter
 is interpolating measurement noise rather than physics.
 
 Second, check causality consistency. For a pole model this is automatic
-in exact arithmetic, so what you are really checking is your *plot and
-conversions*: recompute Im ε from your plotted Re ε via the KK relation
+in exact arithmetic, so what is really being checked is the *plot and
+conversions*: recompute Im ε from the plotted Re ε via the KK relation
 in outline and confirm they are at least of the same magnitude and
 shape. A gross mismatch almost always means a transcription error, such
 as radians confused with Hz (`ω₀ = 2πf`, so a pole entered in Hz is off
@@ -283,7 +283,7 @@ by 6.3×) or ε and ε−1 conflated.
 
 Third, compare Im ε against the tabulated nk at a handful of spot
 frequencies, expressed as absorption. At λ = 550 nm, gold with n ≈ 0.47
-and k ≈ 2.4 gives Im ε = 2nk ≈ 2.3; if your fitted model's Im ε there is
-0.5, your material transmits far more energy unabsorbed than gold, and
+and k ≈ 2.4 gives Im ε = 2nk ≈ 2.3; if the fitted model's Im ε there is
+0.5, the material transmits far more energy unabsorbed than gold, and
 every extinction or heating result is wrong in a way no grid refinement
 repairs. A pole fit is only as trustworthy as this last comparison.
