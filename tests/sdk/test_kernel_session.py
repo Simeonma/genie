@@ -710,37 +710,8 @@ def test_f_replay_survives_attach_after_rebirth(tmp_path):
     assert outs, f"attach op 不得顶掉恢复的 f：\n{text[-600:]}"
 
 
-def test_worker_publish_disabled(monkeypatch):
-    """G13① 锚：会话 worker 禁用 publish——drafts 镜像属本地 SDK 批
-    处理展示通道（决策档案 §4）；worker 里它抓 __main__ 会抓到自身
-    源码（2026-10-13 实证 17KB 泄漏进 GUI 编辑器并触发 reset 重放）。
-    禁用后：publish 返回 False、零 HTTP 外发。"""
-    import http.server
-
-    captured: list[bytes] = []
-
-    class _H(http.server.BaseHTTPRequestHandler):
-        def do_POST(self):
-            n = int(self.headers.get("Content-Length", 0))
-            captured.append(self.rfile.read(n))
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(b"{}")
-
-        def log_message(self, *a):
-            pass
-
-    srv = http.server.HTTPServer(("127.0.0.1", 0), _H)
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    monkeypatch.setenv("GENIE_GUI_URL",
-                       f"http://127.0.0.1:{srv.server_port}")
-
-    events = _spawn_and_exec(
-        "from genie.integrations.live import publish\n"
-        "print('PUB>', publish(label='run'))")
-    out = "".join(e.get("text", "") for e in events if e.get("ev") == "out")
-    assert "PUB> False" in out, "worker 内 publish 应被禁用（返回 False）"
-    assert not captured, "禁用态不得外发任何 draft"
+# （原 test_worker_publish_disabled 已随本地 SDK 镜像通道退役而删除——
+# integrations/live 于 G53 裁决中整体移除，无可禁用之物，2026-10-23。）
 
 
 def test_second_run_is_an_explicit_error():

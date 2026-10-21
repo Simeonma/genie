@@ -17,9 +17,9 @@ from ..models import DomainSpec, LorentzMatSpec, MeshSpec, RunSpec, SimConfig
 from .sweep import SweepHandle, build_sweep_spec
 
 # ── 组合根注入点（G1 分层契约，2026-10-11 定案）──────────────────────
-# core 只依赖 models：expert/sync/pull/attach/publish 的实现在上层
+# core 只依赖 models：expert/sync/pull/attach 的实现在上层
 # （net / integrations），由 ``genie/__init__`` 组合根在 import 时经
-# ``_wire`` 注入。缺省 = 离线降级（sync/pull 返回 False、publish 跳过、
+# ``_wire`` 注入。缺省 = 离线降级（sync/pull 返回 False、
 # expert 报未接线）——只有绕过 ``import genie`` 直捣 core 子模块的形态
 # 才会遇到缺省态，产品面不可达。分层守卫 = tests/sdk/test_layering.py。
 hooks: dict = {}
@@ -252,12 +252,6 @@ class Simulation:
                 "先 f.domain.total_time = 6e-14 再提交")
         cfg = self.to_config()
         _validate_for_submit(cfg)
-        pub = hooks.get("publish")           # 组合根注入（integrations.live）
-        if pub is not None:                  # v2 实时通道：提交瞬间场景先落 GUI
-            try:                             # （best-effort，镜像面绝不影响提交）
-                pub(label="run")
-            except Exception:  # noqa: BLE001
-                pass
         self._job_id = self._client.submit(cfg)
         self.state = "built"
         return self

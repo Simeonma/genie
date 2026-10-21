@@ -51,7 +51,6 @@ from .core.results import FreqResult, IndexResult, TimeResult
 from .core.simulate import Simulation
 from .core.sweep import SweepHandle
 from .integrations.agent_tools import check_script
-from .integrations.live import publish
 
 # ``import genie.material`` 语句级可用（不只属性寻址）——注册进
 # sys.modules 后属性寻址与语句级 import 皆通（material 实体在 core/）。
@@ -79,20 +78,17 @@ def _swap_connect(fn):
 
 
 # ── 组合根（G1 分层契约，2026-10-11 定案）───────────────────────────
-# core 只依赖 models；expert / 提交镜像 publish / 材质库 HTTP 回退的实现在
-# 上层（net / integrations），在此
-# 一次性注入 core 的 hooks——``import genie`` 即接线，core 永不反向
-# import 上层。分层守卫 = tests/sdk/test_layering.py。
+# core 只依赖 models；expert / 材质库 HTTP 回退的实现在上层
+# （net / integrations），在此一次性注入 core 的 hooks——``import genie``
+# 即接线，core 永不反向 import 上层。分层守卫 = tests/sdk/test_layering.py。
 def _wire_core_hooks() -> None:
     from .core import material as _material, preview as _preview
     from .core import simulate as _simulate
-    from .integrations.live import publish as _publish
     from .net import client as _client
     from .net.expert import ExpertSession
 
     _simulate._wire(
         expert_factory=lambda client: ExpertSession(client),
-        publish=_publish,
     )
     def _nk_fetch_via_store(name, url, key, user, timeout):
         """材质库 HTTP 回退的凭据仓版（G72③ 收编散兵）：core 只给
@@ -132,7 +128,7 @@ _wire_agent_surface()
 # Studio/工具消费）+ 结果对象 + 异常。Domain/Mesh/… 经 f.domain 等属性到达；
 # Client 是内部传输层。``material`` 是 client-side 纯函数子模块。
 __all__ = [
-    "connect", "Simulation", "preview_script", "publish",
+    "connect", "Simulation", "preview_script",
     "check_script", "SweepHandle",
     "TimeResult", "FreqResult", "IndexResult",
     "GenieError", "GenieHTTPError", "GenieJobError", "GenieConfigError",

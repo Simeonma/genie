@@ -163,12 +163,12 @@ def test_low_layers_use_relative_imports():
 
 
 def test_composition_root_wires_core():
-    """组合根接线完整性：import genie 后 core hooks 五键 + material 一键
-    全部就位（缺一 = 某条产品面静默退化为离线态）。"""
+    """组合根接线完整性：import genie 后 core/model hooks 全部就位
+    （缺一 = 某条产品面静默退化为离线态）。"""
     import genie  # noqa: F401
     from genie.core import material, simulate
 
-    for key in ("expert_factory", "publish"):
+    for key in ("expert_factory",):
         assert key in simulate.hooks, f"组合根漏接 simulate.hooks[{key!r}]"
     assert "remote_nk_fetch" in material.hooks, \
         "组合根漏接 material.hooks['remote_nk_fetch']"

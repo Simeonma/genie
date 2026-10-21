@@ -632,15 +632,9 @@ def main() -> None:
         return out
     _Client.fetch_result = _fetch_with_note
 
-    # 会话形态无 drafts 镜像（G13① 定案）：publish 是本地 SDK 批处理
-    # 的展示通道（决策档案 2026-10-13-session-local.md §4）；在会话
-    # worker 里它抓 __main__ 会抓到 kernel_worker 自身源码（2026-10-13
-    # 实证：17KB 源码灌进 GUI 编辑器并触发 reset 重放）。两个入口都
-    # 钉死：_submit 的自动镜像（hooks）与 exec 代码里的直接调用
-    # （模块属性——直接调用会绕过 hook，2026-10-13 测试实证）。
-    _no_pub = lambda *a, **k: False              # noqa: E731
-    genie.core.simulate.hooks["publish"] = _no_pub
-    genie.integrations.live.publish = _no_pub
+    # （原"会话形态钉死 publish"的块已随本地 SDK 镜像通道退役而删除——
+    # integrations/live 与 core 的 publish hook 于 G53 裁决中整体移除，
+    # 2026-10-23；drafts 环保留，属云宿主 agent 面板的管道。）
 
     # ── 统一的执行壳（exec 与 run 共用）──────────────────────────────
     # 两件事只有一条路：捕获 stdout、装/拆 SIGALRM、状态相位、错误裁剪、
