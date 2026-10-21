@@ -43,7 +43,7 @@ Tokens are idle-expiring (7 days unused; actively used tokens never expire) — 
 ```python
 import genie
 
-f = genie.connect()                    # everything from env / ~/.genie/config.json
+f = genie.connect()                    # session rail: zero credentials held here
 f = genie.connect("https://genie.example.com", api_key="…")
 ```
 

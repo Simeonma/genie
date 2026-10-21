@@ -279,7 +279,7 @@ def _login_status() -> dict:
     if os.environ.get("GENIE_URL"):
         gw, src = os.environ["GENIE_URL"], "env GENIE_URL"
     elif has_cfg_gw:
-        gw, src = cfg["gateway"], "~/.genie/config.json"
+        gw, src = cfg["gateway"], "~/.genie/credentials.json"
     elif DEFAULT_GATEWAY:
         gw, src = DEFAULT_GATEWAY, "built-in default"
     else:

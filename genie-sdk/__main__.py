@@ -172,7 +172,7 @@ def cmd_connect(args: argparse.Namespace) -> int:
         try:
             gw = resolve_gateway(None)
             src = ("env GENIE_URL" if os.environ.get("GENIE_URL")
-                   else "config.json" if cfg.get("gateway")
+                   else "credentials.json" if cfg.get("gateway")
                    else "内置缺省" if DEFAULT_GATEWAY else "?")
             print(f"✓ 当前网关：{gw}   （来源：{src}）")
         except Exception as e:  # noqa: BLE001

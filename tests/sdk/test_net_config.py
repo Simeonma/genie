@@ -1,6 +1,6 @@
-"""G72a 零配置面：网关/凭据解析优先级链 + `genie connect` CLI。
+"""G72a/④：网关/凭据解析优先级链 + `genie connect` CLI。
 
-链（高→低）：显式参数 > env > ~/.genie/config.json > DEFAULT_GATEWAY。
+链（高→低）：显式参数 > env > ~/.genie/credentials.json > DEFAULT_GATEWAY。
 config 路径在测试里整体替换为 tmp（不碰真实 ~/.genie）。
 """
 from __future__ import annotations
