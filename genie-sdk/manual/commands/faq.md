@@ -57,7 +57,7 @@ Long enough that the observable has happened: a resonance of quality factor Q at
 
 ### How do I choose the source bandwidth?
 
-The Gaussian pulse's `bandwidth` (Hz) sets which spectrum is excited: it resolves features coarser than roughly `bw`, and by time–bandwidth duality the pulse lasts `~1/bw` — wide bandwidth = short pulse = short simulation. With the σ = 0.5/bw convention a 120 THz bandwidth pulse has a ≈9.8 fs FWHM. See [05 · Sources](05-src.html) and [Tutorial 5](tut5.html).
+The Gaussian pulse's `bandwidth` (Hz) sets which spectrum is excited: it resolves features coarser than roughly `bw`, and by time–bandwidth duality the pulse lasts `~1/bw` — wide bandwidth = short pulse = short simulation. With the σ = 0.5/bw convention a 120 THz bandwidth pulse has a ≈9.8 fs time-amplitude FWHM. See [05 · Sources](05-src.html) and [Tutorial 5](tut5.html).
 
 ```python
 f.src.add_plane_wave().freq(300e12).bandwidth(60e12).from_face('z_min')

@@ -1,6 +1,6 @@
 # 04 · f.geom — geometry
 
-> Nine `add_*` factories + `clear()`. Each factory returns a chain builder;
+> Eight `add_*` factories + `clear()`. Each factory returns a chain builder;
 > **in overlapping regions the larger `priority` wins** (same priority:
 > later entries in list order overwrite earlier ones). A misspelled chain
 > method → immediate SDK `ValueError` (linear model with extra=forbid);
@@ -8,14 +8,14 @@
 
 ![Geometry factories](figs/fig-shapes.svg)
 
-## Shared chain conventions (all nine shapes)
+## Shared chain conventions (all eight shapes)
 
 | Chain method | Description |
 |---|---|
 | `.material(n)` | References a material name registered in `f.mat` (**required**) |
 | `.center(x, y, z)` | Center in m, defaults to origin — all shapes except `box`, `polygon_z`, `polygon_swept` (which use x/y/z_range or z_range; the polygon shapes have no `.center` and calling it raises `ValueError`) |
 | `.priority(n)` | Integer, larger wins, default 0 |
-| `.height(h)` | Extrusion thickness along z, m, > 0 — `ngon`/`ellipse`/`ring`/`cylinder`/`sphere` shapes. `polygon_z`/`polygon_swept` have no `.height`; their vertical extent is set only via `.z_range(lo, hi)` (required) |
+| `.height(h)` | Extrusion thickness along z, m, > 0 — `ngon`/`ellipse`/`ring`/`cylinder` shapes. `polygon_z`/`polygon_swept` have no `.height`; their vertical extent is set only via `.z_range(lo, hi)` (required) |
 | `.name(s)` | Optional display name; shown in the GUI left tree and 3D labels. Names must be unique — a duplicate is rejected at submission; omit for a type-name default (`"Box"`, `"N-gon"`, …) |
 
 A structure extending beyond the physical domain is **warned about, not rejected** — a partially outside structure may be intentional. This aligns with the pitfall noted in [Tutorial 6](tut6.html) and [Troubleshooting](troubleshooting.html): a shape that silently falls outside the domain disappears entirely from the built geometry.
