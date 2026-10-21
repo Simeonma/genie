@@ -249,6 +249,16 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
             up = "whoami" if path == "whoami" else f"api/auth/{path}"
             return await _gw_fwd(req, up, timeout=30.0)
 
+        # 登出对称（G72 收尾）：GUI 登出时清**本机**凭据仓。纯本地动作，
+        # 不打网关（远端吊销走 genie logout --token-id / 令牌管理页）。
+        @app.post("/api/identity/clear")
+        async def identity_clear() -> dict:
+            from genie.net.config import clear_config
+            from genie.studio import session_service as _ss
+            clear_config("api_key", "username")
+            _ss._CRED = {}
+            return {"ok": True}
+
         # 工具面（库清单 / 材料拟合）：拟合是服务端真算，超时放宽
         @app.api_route("/api/tools/{path:path}", methods=["GET", "POST"])
         async def api_tools_fwd(path: str, req: Request) -> Response:

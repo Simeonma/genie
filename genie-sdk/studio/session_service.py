@@ -281,7 +281,20 @@ _GW_ALLOW = ("whoami", "api/auth/", "api/tools/", "api/jobs", "api/health")
 # ── 会话代持凭据（G72 终稿：token 只住会话，脚本零凭据）────────────
 # 进程内缓存，首用从凭据仓（~/.genie/credentials.json）载入；
 # 登录截获（下方 _capture_login）即时更新内存 + 落盘。
+# **仅本机单用户入口启用**（enable_cred_broker）：多用户云宿主上开它会
+# 把"第一个登录者"的 token 变成全机共享兜底——跨用户串号，绝对不行。
 _CRED: dict | None = None
+_CRED_BROKER = False
+
+
+def enable_cred_broker(on: bool = True) -> None:
+    """启用凭据代持（``genie studio`` / console / 无头自起等**本机**入口调）。
+
+    网关直连登录（gateway_forward 的截获与空凭据代拨）只在开着时工作；
+    云宿主（多用户共享一个进程）**永不启用**。
+    """
+    global _CRED_BROKER
+    _CRED_BROKER = bool(on)
 
 
 def _stored_cred() -> dict:
@@ -350,13 +363,14 @@ def gateway_forward(method: str, path: str, *, key: str = "",
     HTTP 路由（`/gw/{path}`）与同进程适配器（`LocalSessionHost`）都调它
     ——所以"上游不可达"的翻译只有一处，无论调用方在不在本进程。
 
-    凭据代持（G72）：调用方没带 key 时用**会话持有的凭据**代拨——脚本
-    经 /gw 的请求从头到尾不碰 token。
+    凭据代持（G72，仅本机形态——``enable_cred_broker`` 开启时）：调用方
+    没带 key 时用**会话持有的凭据**代拨——脚本经 /gw 的请求从头到尾不碰
+    token。多用户宿主不开代持，行为与从前完全一致（无 key 即裸拨）。
     """
     if not _gw_allowed(path):
         raise HTTPException(status_code=403,
                             detail=f"会话不代拨该路径：/{path}")
-    cred = _stored_cred() if not key else {}
+    cred = (_stored_cred() if (_CRED_BROKER and not key) else {})
     headers = {}
     if key:
         headers["X-API-Key"] = key
@@ -373,8 +387,8 @@ def gateway_forward(method: str, path: str, *, key: str = "",
             timeout=float(timeout))
     except Exception as e:  # noqa: BLE001 — 唯一一次翻译
         raise _upstream_down(e) from e
-    if (method.upper() == "POST" and path.lstrip("/") == "api/auth/login"
-            and r.status_code == 200):
+    if (_CRED_BROKER and method.upper() == "POST"
+            and path.lstrip("/") == "api/auth/login" and r.status_code == 200):
         _capture_login(data or b"", r.content)     # 登录截获（单一咽喉点）
     return r.status_code, r.content, r.headers.get("content-type", "")
 
@@ -424,6 +438,7 @@ def serve(port: int = 0, *, host: str = "127.0.0.1",
     global _TOKEN
     if token:
         _TOKEN = token
+    enable_cred_broker()        # serve() 只被本机入口调用（console/无头自起）
     workspace_root().mkdir(parents=True, exist_ok=True)
     server = uvicorn.Server(uvicorn.Config(
         app, host=host, port=port, log_level="warning"))

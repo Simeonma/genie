@@ -42,6 +42,12 @@ def fake_rq(monkeypatch):
     return calls
 
 
+@pytest.fixture(autouse=True)
+def broker_on(monkeypatch):
+    """本文件默认按"本机形态"开代持；host-safety 用例自己关。"""
+    monkeypatch.setattr(ss, "_CRED_BROKER", True)
+
+
 # ── 代拨注入 ────────────────────────────────────────────────────────
 
 def test_gateway_forward_injects_stored_cred(fake_rq, monkeypatch):
@@ -97,6 +103,51 @@ def test_capture_bad_payload_never_crashes(monkeypatch):
         lambda *a, **k: _Resp(content=b"not-json"))
     ss.gateway_forward("POST", "api/auth/login", data=b"\xff\xfe")
     assert ss._CRED is None or "api_key" not in (ss._CRED or {})
+
+
+# ── 宿主安全锚：代持关闭（多用户云宿主形态）───────────────────────
+
+def test_broker_off_no_injection_no_capture(monkeypatch):
+    """宿主上代持必须完全隐身：不代拨、不截获——第一个登录者的 token
+    绝不能变成全机共享兜底（跨用户串号是安全洞）。"""
+    import requests
+    monkeypatch.setattr(ss, "_CRED_BROKER", False)
+    calls: list[dict] = []
+
+    def _fake(method, url, **kw):
+        calls.append({"method": method, "headers": kw.get("headers") or {}})
+        return (_Resp(payload={"token": "gt_should_not_capture"})
+                if "login" in url else _Resp())
+
+    monkeypatch.setattr(requests, "request", _fake)
+    ss.gateway_forward(
+        "POST", "api/auth/login",
+        data=json.dumps({"username": "a", "password": "x"}).encode())
+    ss.gateway_forward("GET", "api/jobs")
+    assert "api_key" not in ncfg.load_config()
+    assert not calls[1]["headers"]             # 无 key 即裸拨
+
+
+# ── 登出清仓（GUI 对称）──────────────────────────────────────────
+
+class _FakeSession:
+    def health(self):
+        return {"ok": True, "upstream": "http://stub", "sdk_version": "x"}
+
+    def gateway(self, method, path, **kw):
+        return 200, b"{}", "application/json"
+
+
+def test_identity_clear_endpoint(monkeypatch):
+    from fastapi.testclient import TestClient
+    from genie.studio.server import create_app
+    ncfg.save_config(api_key="gt_x", username="dora")
+    monkeypatch.setattr(ss, "_CRED", {"api_key": "gt_x", "username": "dora"})
+    client = TestClient(create_app(mount_session=True, session=_FakeSession()))
+    r = client.post("/api/identity/clear")
+    assert r.status_code == 200 and r.json()["ok"] is True
+    assert "api_key" not in ncfg.load_config()
+    assert ss._CRED == {}
 
 
 # ── 迁移：config.json → credentials.json ───────────────────────────

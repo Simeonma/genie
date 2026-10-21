@@ -45,4 +45,5 @@ def _pin_session_state(tmp_path, monkeypatch):
     from genie.net import config as _nc
     monkeypatch.setattr(_ss, "_TOKEN", "")
     monkeypatch.setattr(_ss, "_CRED", None)
+    monkeypatch.setattr(_ss, "_CRED_BROKER", False)
     monkeypatch.setattr(_nc, "_store_dir", lambda: tmp_path / "genie-home")

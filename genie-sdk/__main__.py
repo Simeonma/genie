@@ -85,6 +85,8 @@ def cmd_studio(args: argparse.Namespace) -> int:
     from genie.studio.session_local import LocalSessionHost
 
     attach = (args.attach or "").rstrip("/")
+    if not attach:
+        ss.enable_cred_broker()     # 本机单用户形态：登录截获/凭据代拨开启
     gui_port = args.port if args.port else _next_free_port("127.0.0.1", 8777)
     gui_url = f"http://127.0.0.1:{gui_port}"
     require_auth = not (args.open

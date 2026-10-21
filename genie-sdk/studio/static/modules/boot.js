@@ -990,6 +990,9 @@ function connDialog(initialView) {
         if (so) so.textContent = "Sign out anyway";
         return;
       }
+      /* G72：登出同时清本机凭据仓（会话代持的 token）——sendBeacon
+       * 在 unload 后仍能送达；失败不拦登出（大不了仓里 token 留到过期）。 */
+      try { navigator.sendBeacon("/api/identity/clear"); } catch (e) {}
       localStorage.removeItem("genie_v2_api_key");
       localStorage.removeItem("genie_v2_username");
       genieDropSession();      /* O2：退出 = 模型身份作废（下次登录新模型） */
