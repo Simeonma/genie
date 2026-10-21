@@ -287,10 +287,11 @@ def _restore_factory():
 
 
 def test_mcp_tool_surface_shape():
-    """MCP 面：8 个工具；脚本语义的两个（current_script/publish_script）已退役。"""
+    """MCP 面：9 个工具（G72b 增 login_status：登录/配置状态，非会话面）；
+    脚本语义的两个（current_script/publish_script）已退役。"""
     assert TOOL_NAMES == {"get_model", "edit_model", "run_script", "run_model",
                           "get_results", "check_script", "get_starter_script",
-                          "list_materials"}
+                          "list_materials", "login_status"}
     assert "current_script" not in TOOL_NAMES and "publish_script" not in TOOL_NAMES
     by = {t["name"]: t for t in TOOLS}
     for name in TOOL_NAMES:

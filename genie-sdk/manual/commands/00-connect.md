@@ -30,6 +30,8 @@ Configure once on a machine with the CLI, then call `genie.connect()` bare:
 ```bash
 genie connect https://genie.example.com --username me   # writes ~/.genie/config.json (0600)
 genie connect                                           # show current resolution
+genie login                                             # interactive: get a token via device authorization
+genie logout                                            # revoke remotely + clear locally
 ```
 
 ```python

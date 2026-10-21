@@ -25,6 +25,7 @@ import secrets
 import socket
 import sys
 import threading
+import time
 import webbrowser
 
 # Windows 控制台缺省 GBK/OEM 代码页，打印 ✓/✗ 这类符号会直接
@@ -197,6 +198,86 @@ def cmd_connect(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_login(args: argparse.Namespace) -> int:
+    """``genie login``：设备授权流拿 token 写进本机配置（G72b）。
+
+    密码 getpass 无回显、只过一遍手、**永不写盘**——config.json 最终只存
+    token（当作 api_key 走既有优先级链）。"""
+    import getpass
+
+    from genie.models.errors import GenieConfigError
+    from genie.net import device_login as dl
+    from genie.net.config import resolve_gateway, save_config
+
+    url = resolve_gateway(getattr(args, "gateway", None) or None)
+    username = args.username or input("用户名（或邮箱）：").strip()
+    while not username:
+        username = input("用户名不能为空，重输：").strip()
+    password = getpass.getpass("密码：")
+    while not password:
+        password = getpass.getpass("密码不能为空，重输：")
+
+    print(f"· 正在向 {url} 申请设备码 …")
+    dev = dl.create_device(url)
+    print(f"  设备码：{dev['user_code']}   （在网页上输入它即可批准；"
+          f"本 CLI 将直接用你刚输的凭据批准）")
+    print(f"  网页地址（Phase 2 前仅供参考）：{dev.get('verification_url')}")
+
+    def _tick(seconds: float) -> None:
+        print(f"  … 等待网关发放 token（{int(seconds)}s）")
+        time.sleep(seconds)
+
+    try:
+        out = dl.login(url, username=username, password=password,
+                       sleep=_tick, open_browser=args.browser)
+    except GenieConfigError as e:
+        print(f"✗ 登录失败：{e}")
+        return 1
+    save_config(api_key=out["token"], username=out["username"], gateway=url)
+    print(f"✓ 已登录为 {out['username']}，token 已写入本机配置"
+          "（空闲 7 天过期；过期后重跑 genie login）")
+    print("  之后 connect() 无参即通。登出：genie logout")
+    return 0
+
+
+def cmd_logout(args: argparse.Namespace) -> int:
+    """``genie logout``：吊销网关侧 token + 清本机凭据（G51 收口）。
+
+    网关的 token 列表不带哈希，无法确认"哪把是本机的"——远端吊销只在
+    **能精确对应**时自动做（--token-id 显式指定，或全账号唯一的
+    device-login token）；否则列出候选让用户挑，宁缺勿误杀。"""
+    from genie.net import client as _client
+    from genie.net.config import clear_config, load_config, resolve_credential, resolve_gateway
+
+    url = resolve_gateway(getattr(args, "gateway", None) or None)
+    key = resolve_credential(None, "GENIE_API_KEY", "api_key")
+    if not key and not args.token_id:
+        print("· 本机没有已存的 token，无需登出")
+        return 0
+    if not args.keep_remote and key:
+        try:
+            cli = _client.Client(url, key)
+            toks = cli._s.get(f"{url}/api/auth/tokens",
+                              timeout=10).json().get("tokens") or []
+            dev = [t for t in toks if t.get("name") == "device-login"]
+            tid = args.token_id or (dev[0]["id"] if len(dev) == 1 else None)
+            if tid is None:
+                print("· 找不到可精确对应的 token——候选（按 id 手动吊销）：")
+                for t in toks:
+                    print(f"    id={t['id']}  {t['name']}  建于 {t['created']}"
+                          f"  最近使用 {t.get('last_used')}")
+                print(f"  运行：genie logout --token-id <id>")
+            else:
+                r = cli._s.delete(f"{url}/api/auth/tokens/{tid}", timeout=10)
+                print(f"· 网关侧吊销 token id={tid}：HTTP {r.status_code}"
+                      + ("（已吊销）" if r.status_code < 300 else "（失败）"))
+        except Exception as e:  # noqa: BLE001 —— 本地清理不因网络失败而跳过
+            print(f"⚠ 网关侧吊销失败（{e}）——token 仍有效，可稍后重试或手动吊销")
+    clear_config("api_key")
+    print("✓ 已清除本机 token")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
         prog="genie", description="GENIE——GPU 电磁仿真软件"
@@ -225,6 +306,19 @@ def main(argv: list[str] | None = None) -> int:
     cn.add_argument("--api-key", default=None, help="API key（也可后补）")
     cn.add_argument("--username", default=None, help="用户名（password 登录用）")
     cn.set_defaults(fn=cmd_connect)
+    lg = sub.add_parser("login", help="登录并保存 token（设备授权流，一次即可）")
+    lg.add_argument("--username", default="", help="用户名或邮箱（缺省交互输入）")
+    lg.add_argument("--gateway", default="", help="网关地址（缺省走解析链）")
+    lg.add_argument("--browser", action="store_true",
+                    help="同时打开验证网页（Phase 2 前网页未上线，仅供参考）")
+    lg.set_defaults(fn=cmd_login)
+    lo = sub.add_parser("logout", help="吊销网关侧 token 并清除本机凭据")
+    lo.add_argument("--gateway", default="", help="网关地址（缺省走解析链）")
+    lo.add_argument("--token-id", type=int, default=None,
+                    help="显式指定要吊销的 token id")
+    lo.add_argument("--keep-remote", action="store_true",
+                    help="只清本机，不吊销网关侧")
+    lo.set_defaults(fn=cmd_logout)
     ns = ap.parse_args(argv)
     if ns.cmd is None:                  # 裸敲 genie = studio（一键形态）
         ns.cmd = "studio"

@@ -53,6 +53,21 @@ def save_config(*, gateway: str | None = None, api_key: str | None = None,
     return p
 
 
+def clear_config(*keys: str) -> None:
+    """从身份配置里删掉指定字段（``genie logout`` 清 token 用）。"""
+    cfg = load_config()
+    if not any(k in cfg for k in keys):
+        return
+    p = config_path()
+    for k in keys:
+        cfg.pop(k, None)
+    if cfg:
+        p.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n",
+                     encoding="utf-8")
+    else:
+        p.unlink(missing_ok=True)
+
+
 def resolve_gateway(explicit: str | None = None) -> str:
     """按优先级链解析网关地址；解析不出 → 报错并给**下一步动作**。
 

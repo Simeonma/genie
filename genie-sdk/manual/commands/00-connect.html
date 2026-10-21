@@ -340,7 +340,9 @@ SDK Docs</a></div></div>
                    &gt;  ~/.genie/config.json  &gt;  built-<span class="kw">in</span> default</code></pre>
 <p>Configure once on a machine with the CLI, then call <code>genie.connect()</code> bare:</p>
 <pre class="code"><code>genie connect https://genie.example.com --username me   <span class="cm"># writes ~/.genie/config.json (0600)</span>
-genie connect                                           <span class="cm"># show current resolution</span></code></pre>
+genie connect                                           <span class="cm"># show current resolution</span>
+genie login                                             <span class="cm"># interactive: get a token via device authorization</span>
+genie logout                                            <span class="cm"># revoke remotely + clear locally</span></code></pre>
 <pre class="code"><code><span class="kw">import</span> genie
 
 f = genie.<span class="fn">connect</span>()                    <span class="cm"># everything from env / ~/.genie/config.json</span>

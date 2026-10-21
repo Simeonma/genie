@@ -240,6 +240,14 @@ TOOLS: list[dict[str, Any]] = [
             "返回 {models: [...], count}。"),
         "parameters": {"type": "object", "properties": {}},
     },
+    {
+        "name": "login_status",
+        "description": (
+            "查本机登录/配置状态：网关地址来源（env/配置文件/缺省）、是否已存 "
+            "token（只报有无与用户名，**绝不返回 token 本身**）。401/未配置时"
+            "先调我，按结果指引用户跑 `genie login` 或 `genie connect <地址>`。"),
+        "parameters": {"type": "object", "properties": {}},
+    },
 ]
 
 TOOL_NAMES = {t["name"] for t in TOOLS}
@@ -258,6 +266,38 @@ def _list_materials() -> dict:
         except Exception:  # noqa: BLE001
             models = []
     return {"models": models, "count": len(models)}
+
+
+def _login_status() -> dict:
+    """本机登录/配置状态（零网络；token 本身绝不出现）。"""
+    import os
+
+    from ..net.config import DEFAULT_GATEWAY, load_config
+
+    cfg = load_config()
+    has_cfg_gw = bool(cfg.get("gateway"))
+    if os.environ.get("GENIE_URL"):
+        gw, src = os.environ["GENIE_URL"], "env GENIE_URL"
+    elif has_cfg_gw:
+        gw, src = cfg["gateway"], "~/.genie/config.json"
+    elif DEFAULT_GATEWAY:
+        gw, src = DEFAULT_GATEWAY, "built-in default"
+    else:
+        gw, src = None, None
+    logged_in = bool(cfg.get("api_key") or os.environ.get("GENIE_API_KEY"))
+    return {
+        "ok": True,
+        "gateway": gw,
+        "gateway_source": src,
+        "logged_in": logged_in,
+        "username": cfg.get("username") if logged_in else None,
+        "next_action": (
+            None if (gw and logged_in) else
+            ("run `genie login` (after `genie connect <gateway url>` "
+             "if the gateway is not configured)"
+             if gw else "run `genie connect <gateway url>` first, then `genie login`")
+        ),
+    }
 
 
 def _at(cfg, path: str):
@@ -373,6 +413,8 @@ def execute_tool(name: str, args: dict, *, session: Any = None) -> dict:
         return check_script(args.get("script") or "")
     if name == "list_materials":
         return _list_materials()
+    if name == "login_status":
+        return _login_status()
     # ── 会话面（要连上正在跑的 Studio）────────────────────────────────
     try:
         cli = _session(session)
