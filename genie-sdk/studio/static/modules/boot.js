@@ -991,10 +991,13 @@ function connDialog(initialView) {
         return;
       }
       /* G72：登出同时清本机凭据仓（会话代持的 token）——sendBeacon
-       * 在 unload 后仍能送达；失败不拦登出（大不了仓里 token 留到过期）。 */
+       * 在 unload 后仍能送达；失败不拦登出（大不了仓里 token 留到过期）。
+       * G64 站长裁定 2026-10-23：换账号 = 干净进场——脚本与凭据/模型身份
+       * 同批清光（编辑器文本不在下一个账号的屏幕上出现）。 */
       try { navigator.sendBeacon("/api/identity/clear"); } catch (e) {}
       localStorage.removeItem("genie_v2_api_key");
       localStorage.removeItem("genie_v2_username");
+      localStorage.removeItem("genie_v2_script");
       genieDropSession();      /* O2：退出 = 模型身份作废（下次登录新模型） */
       close(); location.reload();
       return;
