@@ -7,11 +7,6 @@
  * 表单/树/3D 刷新。SDK/agent 与 terminal 同一执行层（一步到位）。 */
 let termBusy = false;
 let termPollTimer = null;
-/* 命令关联（O2）：/api/exec 返回的 exec id + 环里的 done(id)。
- * 只认领"自己那一条"——否则另一个标签页在跑时，本页会把自己的命令
- * 误判成还在跑（或多标签同时提交时错认完成）。 */
-let _runningExecId = null;
-let _execDoneInRing = false;
 const termHistory = [];
 let termHistIdx = -1, termDraft = "";
 /* 停止钮（A2「长任务必须能掐」）：busy 期可见，点击 = POST /api/exec/stop
@@ -67,13 +62,6 @@ const SessionSync = {
           window.__jobProgress(l.data || {});
         if (typeof window.__mobileProgress === "function")
           window.__mobileProgress(l.data || {});
-        continue;
-      }
-      if (kind === "done") {
-        /* 命令关联（O2）：done 事件带 exec id——只认领自己那一条。
-         * busy 是会话级（全局），exec id 才是"我的命令"。 */
-        if (l.data && l.data.id != null && l.data.id === _runningExecId)
-          _execDoneInRing = true;
         continue;
       }
       if (kind === "job-done" && l.data) {
@@ -266,18 +254,14 @@ async function _execFlow(label, submit) {
   }
   termBusy = true;   /* 同步置位（防连点竞态）：置位前不得有任何 await */
   await flushPendingCfgPush();
-  let j;
   try {
-    j = await submit();
+    await submit();
   } catch (e) {
     termAppend("✗ " + (e && e.message ? e.message : e) + "\n", "term-err");
     termBusy = false;
     setStopVisible(false);
     return;
   }
-  /* 认领本次 exec id（O2：完成判据不靠全局 busy） */
-  _runningExecId = (j && j.id != null) ? j.id : null;
-  _execDoneInRing = false;
   _startPolling();
 }
 
@@ -306,20 +290,19 @@ function _startPolling() {
        * GUI 不同步还看似正常。措辞走统一出口（O2）。 */
       termAppend("✗ 输出通道 " + apiFailed("读取输出", r, j) + "\n", "term-err");
       clearInterval(termPollTimer); termPollTimer = null; termBusy = false;
-      _runningExecId = null; _execDoneInRing = false;
       setStopVisible(false);
       return;
     }
     SessionSync.ingest(j);          /* 拉增量、喂同步器——投影自己订阅 */
     setStopVisible(!!j.busy);       /* 停止钮可见性 = 会话忙闲（轮询响应驱动） */
-    /* 完成判据（O2 起两条）：会话不忙了，**或**自己那条 done 已经进环
-     * （后者覆盖"排队/另一个标签页立刻接手"的窗口）。 */
-    if (!j.busy || _execDoneInRing) {
+    /* 完成判据（O2 收敛为一句话）：**会话不忙了** = 我这条 op 回了 done。
+     * busy 由在途 op 账本投影（kernel_session._inflight），不再有
+     * "另一条 done 也算我完成"的旁路——那条旁路依赖环里出现 done 条目，
+     * 而它从来没出现过（死代码，G71 顺手删除）。 */
+    if (!j.busy) {
       clearInterval(termPollTimer);
       termPollTimer = null;
       termBusy = false;
-      _runningExecId = null;
-      _execDoneInRing = false;
       /* 结果模式切换已上收 job-done 事件（ingest 内）——这里不再
        * 正则猜 termLastCode（2026-10 架构收敛：跑没跑仿真看事实，
        * 不看提交文本长什么样）。 */

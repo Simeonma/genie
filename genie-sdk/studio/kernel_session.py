@@ -148,11 +148,11 @@ class SessionKernel:
         self._seq = 0
         self._cfg: dict | None = None
         self._cfg_seq = 0
-        self._busy = False
-        # 生命周期现值（2026-10 站长裁决「状态监测架构收敛」）：worker 的
-        # state 事件驱动，output() 随响应回快照——GUI 刷新第一拍即对表，
-        # 按钮/进度条零旁证（不重放历史、不猜文本）。
-        self._phase = "idle"
+        # 在途 op 账本：id → op 名。**「忙」不是字段，是这个账本的投影**——
+        # 存成独立布尔就会漂：G71 里 attach 的回执曾把正在跑的 exec 标成空闲。
+        self._inflight: dict[int, str] = {}
+        # 相位现值：worker 的 state 事件原样存（本类不改写），output() 投影出去。
+        self._worker_phase = "idle"
         self._job_id = ""
         self._key = ""          # 授权凭据（可空）：换绑只改这一格
         self._next_id = 1
@@ -206,11 +206,10 @@ class SessionKernel:
         return {"session_id": self._session_id, "key_changed": changed,
                 "alive": self._alive}
 
-    def _begin(self) -> None:
-        """一次执行的公共前置（忙/相位）。exec id 由调用方取号。"""
-        self._set_busy(True)
+    def _begin(self, eid: int, op: str) -> None:
+        """一次 op 的公共前置：记账。相位由 worker 自己报，本类不代它说。"""
         with self._lock:
-            self._phase = "exec"
+            self._inflight[eid] = op
 
     def submit(self, code: str, *, mode: str = "run",
                label: str = "") -> int:
@@ -228,7 +227,7 @@ class SessionKernel:
         eid = self._next_id
         self._next_id += 1
         self._emit("input", code, "manager", mark=label)
-        self._begin()
+        self._begin(eid, "exec")
         self._send({"op": "exec", "id": eid, "code": code,
                     "mode": mode if mode in ("run", "build") else "run",
                     "url": backend(), "key": self._key})
@@ -245,7 +244,7 @@ class SessionKernel:
         self._ensure()
         eid = self._next_id
         self._next_id += 1
-        self._begin()
+        self._begin(eid, "run")
         self._send({"op": "run", "id": eid, "gpu": gpu,
                     "timeout_s": timeout_s,
                     "url": backend(), "key": self._key})
@@ -259,7 +258,7 @@ class SessionKernel:
         self._ensure()
         eid = self._next_id
         self._next_id += 1
-        self._begin()
+        self._begin(eid, "patch")
         self._send({"op": "patch", "id": eid, "ops": list(ops or []),
                     "url": backend(), "key": self._key})
         return eid
@@ -269,7 +268,7 @@ class SessionKernel:
         self._ensure()
         eid = self._next_id
         self._next_id += 1
-        self._begin()
+        self._begin(eid, "replace")
         self._send({"op": "replace", "id": eid, "model": model,
                     "url": backend(), "key": self._key})
         return eid
@@ -280,7 +279,7 @@ class SessionKernel:
         worker 侧状态感知：exec 期 → StopExec 掐断 + 孤儿作业清理；
         空闲期 → 忽略（worker 永不因 SIGINT 死亡）。非忙/进程已死
         返回 False（无事可停）；信号发不出去（OSError）同样 False。"""
-        if not (self._alive and self._busy):
+        if not (self._alive and self.busy):
             return False
         try:
             if os.name == "nt":
@@ -297,21 +296,30 @@ class SessionKernel:
     def output(self, since: int) -> dict:
         """读取会话快照（**纯读**，不唤起——唤起是产品策略，见 ``ensure()``）。"""
         with self._lock:
-            lines = [l for l in self._lines if l["seq"] > since]
-            return {"lines": lines, "busy": self._busy,
-                    "phase": self._phase, "job_id": self._job_id,
+            cfg = self._cfg or {}
+            return {"lines": [l for l in self._lines if l["seq"] > since],
+                    # 两个投影：忙 = 账本非空；相位 = worker 报的（空闲时归 idle）
+                    "busy": bool(self._inflight),
+                    "phase": self._worker_phase if self._inflight else "idle",
+                    "job_id": self._job_id,
                     "session_id": self._session_id,
-                    "cfg": (self._cfg or {}).get("cfg") if self._cfg else None,
-                    "resolved": (self._cfg or {}).get("resolved") if self._cfg else None,
+                    "cfg": cfg.get("cfg"),
+                    "resolved": cfg.get("resolved"),
                     "cfg_seq": self._cfg_seq,
-                    "origin": (self._cfg or {}).get("origin") if self._cfg else None,
-                    "paths": (self._cfg or {}).get("paths") if self._cfg else []}
+                    "origin": cfg.get("origin"),
+                    "paths": cfg.get("paths") or []}
 
     # ---- 内部 ----
 
     @property
     def _alive(self) -> bool:
         return self._proc is not None and self._proc.poll() is None
+
+    @property
+    def busy(self) -> bool:
+        """是否有在途 op（= 账本非空）。**唯一**的「忙」判据（stop/输出都用它）。"""
+        with self._lock:
+            return bool(self._inflight)
 
     def ensure(self) -> None:
         """确保会话活着（**读即唤起**的产品策略入口）。
@@ -449,7 +457,7 @@ class SessionKernel:
             # B2：环与 _seq 不再清——输出历史跨 worker 重生保留（清了就
             # 回不到 seq 续接，理由见 _restore_ring）；重生的全部语义 =
             # 杀旧进程、起新进程（f 由 worker 读 session_state.json 重放）。
-            self._busy = False
+            self._inflight.clear()
         if self._proc and self._proc.poll() is None:
             try:
                 self._proc.kill()
@@ -486,14 +494,16 @@ class SessionKernel:
             self._send({"op": "attach", "url": backend(), "key": self._key})
 
     def _send(self, obj: dict) -> None:
+        """发一条给 worker。发不出去 = 在途 op 当场作废（否则调用方白等到超时）。"""
         if not self._alive or self._proc.stdin is None:
+            self._ops_lost()
             return
         try:
             with self._wlock:
                 self._proc.stdin.write(json.dumps(obj, ensure_ascii=False) + "\n")
                 self._proc.stdin.flush()
         except (BrokenPipeError, OSError):
-            self._set_busy(False)
+            self._ops_lost()
 
     def _emit(self, kind: str, text: str, origin: str, *, mark: str = "",
               data: dict | None = None) -> None:
@@ -513,9 +523,15 @@ class SessionKernel:
                 del self._lines[: len(self._lines) - MAX_LINES]
             self._ring_append(entry)   # B2：append 环后同步落盘一行
 
-    def _set_busy(self, v: bool) -> None:
+    def _op_end(self, eid) -> None:
+        """销账：只认自己那一号。attach 的回执是 -1，天然销不掉任何 op。"""
         with self._lock:
-            self._busy = v
+            self._inflight.pop(eid, None)
+
+    def _ops_lost(self) -> None:
+        """管道/进程没了：在途 op 全部作废——这是事实，不是猜测。"""
+        with self._lock:
+            self._inflight.clear()
 
     def _note(self, text: str) -> None:
         self._emit("note", f"── {text}\n", "manager")
@@ -540,7 +556,7 @@ class SessionKernel:
                 # 生命周期 state 事件 → 现值跟踪（output 快照的数据源）
                 if isinstance(data, dict) and data.get("phase"):
                     with self._lock:
-                        self._phase = data["phase"]
+                        self._worker_phase = data["phase"]
                         if data.get("job_id"):
                             self._job_id = data["job_id"]
                         elif data["phase"] == "idle":
@@ -562,19 +578,19 @@ class SessionKernel:
                                  "origin": ev.get("origin") or "exec",
                                  "paths": ev.get("paths") or []}
                     self._cfg_seq += 1
+            elif kind == "ack":
+                # 控制面回执（attach/bind）：不是 op 完成，不动账本——
+                # 换凭据不该把正在跑的 exec 标成空闲（G71 的根因）。
+                pass
             elif kind == "done":
-                # done.err 仍在协议里（API/agent 消费用）；terminal 显示由
-                # worker 的 out 流唯一负责——traceback/⏱/回滚提示已在环里，
-                # 不再二次打印（2026-10-11 站长裁决：报错只显示一次，
-                # VS Code 式单面终端）。
-                self._set_busy(False)
-                with self._lock:
-                    self._phase = "idle"    # done 兜底（worker state idle
-                                            # 已先行，此处防事件丢失）
+                # 唯一含义 = "第 id 号 op 完成了"。done.err 仍在协议里（API/agent
+                # 消费用）；terminal 显示由 worker 的 out 流唯一负责——traceback/
+                # ⏱/回滚提示已在环里，不再二次打印（2026-10-11 站长裁决）。
+                self._op_end(ev.get("id"))
         # stdout EOF = worker 退出（B2：不再有「会话态已丢」——输出历史
         # 在环落盘里，会话 f 由 worker 重生时读 session_state.json 重放）
         self._note("会话进程退出——下次执行自动重生（输出历史保留，会话 f 由落盘恢复）")
-        self._set_busy(False)
+        self._ops_lost()
 
     def _pump_err(self) -> None:
         proc = self._proc

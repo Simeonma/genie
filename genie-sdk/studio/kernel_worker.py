@@ -26,6 +26,8 @@
   → {"ev":"done","id":N,"ok":bool,"err":…} 纯 busy 信号（err 供 API/agent
                                             消费；terminal 渲染唯一走 out
                                             流——禁止把 done.err 渲染进环）
+  → {"ev":"ack","id":-1,"ok":bool,"err":…}  控制面回执（attach/bind 的结果）：
+                                            **不是 op 完成**，父层不得据此清忙
 
 信任契约：与 preview 沙箱（unshare 断网/环境清洗/用完即杀）**相反**——
 这是用户 key 的真执行面；卡死由父层 kill+重生（B2：输出历史跨重生
@@ -704,12 +706,12 @@ def main() -> None:
         if op in ("attach", "bind"):      # bind = 旧名（前端/旧宿主兼容）
             try:
                 attach(msg)
-                emit({"ev": "done", "id": -1, "ok": True, "err": ""})
+                emit({"ev": "ack", "id": -1, "ok": True, "err": ""})
             except Exception as e:   # noqa: BLE001 — 连接失败回终端，进程存活
                 emit({"ev": "out", "kind": "error",
                       "text": "✗ 会话连接失败: "
                               + "".join(traceback.format_exception_only(e))})
-                emit({"ev": "done", "id": -1, "ok": False, "err": str(e)})
+                emit({"ev": "ack", "id": -1, "ok": False, "err": str(e)})
         elif op in ("patch", "replace"):
             # 两个模型写入原语（M3b）：
             #   patch   —— 路径级增量（表单/树/工具条的每一次改动）；

@@ -245,6 +245,12 @@ def test_failed_exec_error_displayed_once():
 # ---- 停止（A2「长任务必须能掐」，2026-10-11 站长裁决）----
 
 def _wait_idle(k: SessionKernel, timeout_s: float = 15.0) -> bool:
+    """等自己在途 op 全部销账。
+
+    `busy` 现在是**在途 op 账本的投影**（kernel_session：_inflight），所以
+    "不忙" 等价于 "我发出去的那条 op 回了 done"——不需要再叠 cfg_seq / 文本
+    之类的旁证（G71 修的就是"用事件名推状态"那套）。
+    """
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         if not k.output(0)["busy"]:
@@ -253,53 +259,8 @@ def _wait_idle(k: SessionKernel, timeout_s: float = 15.0) -> bool:
     return False
 
 
-def _wait_apply(k: SessionKernel, cfg_seq0: int, timeout_s: float = 30.0) -> dict:
-    """等一次写入落地：返回 `busy=False` 且 `cfg_seq` 已前进的 output。
-
-    `_wait_idle` 不能单独用作落地判据：写是异步的，调用方可能在 worker
-    还没开始处理时就看到 `busy=False`，于是读到**旧** cfg（实测：patch
-    domain.cfl=0.5 后读到默认 0.9）。
-    """
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        out = k.output(0)
-        if not out["busy"] and out.get("cfg_seq", 0) > cfg_seq0:
-            return out
-        time.sleep(0.05)
-    out = k.output(0)
-    raise AssertionError(
-        "写入未落地：cfg_seq %r→%r busy=%r lines=%r"
-        % (cfg_seq0, out.get("cfg_seq"), out["busy"],
-           [l["text"][:50] for l in out["lines"]][-4:]))
-
-
-def _wait_cfg(k: SessionKernel, timeout_s: float = 30.0) -> dict:
-    """等一次写入**真的落地**，返回落地后的 cfg。
-
-    `_wait_idle` 单独用有竞态：`submit()` 刚返回时 worker 可能还没把
-    `busy` 置真，于是它立刻返回 True、读到的是旧 cfg（None）。判据要同时
-    满足"不在忙"和"cfg 非空"，否则就是在等一个还没开始的活。
-    """
-    deadline = time.time() + timeout_s
-    while time.time() < deadline:
-        out = k.output(0)
-        if not out["busy"] and out["cfg"]:
-            return out["cfg"]
-        time.sleep(0.1)
-    out = k.output(0)
-    raise AssertionError(
-        "等到 cfg 超时：busy=%r cfg=%r lines=%r"
-        % (out["busy"], bool(out["cfg"]),
-           [l["text"][:60] for l in out["lines"]][-5:]))
-
-
 def _wait_text(k: SessionKernel, needle: str, timeout_s: float = 15.0) -> str:
-    """等某段文字出现在第 0 号会话的输出里，返回当时的全文。
-
-    为什么不 `_wait_idle` + 立刻读：`busy` 与输出环是两条独立更新的事件，
-    标志先翻、文本后到就会偶发读到"还没有那句错误"（实测全量跑偶发一次、
-    单跑必过）。断言的目标是"错误最终被报出来"，所以等可观测结果。
-    """
+    """等某段文字出现在第 0 号会话的输出里，返回当时的全文（断言"事件被报出来"）。"""
     deadline = time.time() + timeout_s
     text = ""
     while time.time() < deadline:
@@ -746,10 +707,10 @@ def test_patch_applies_path_and_tags_origin(tmp_path):
              "f.domain.total_time = 6e-14\n")
     assert _wait_idle(k)
     before = k.output(0)["cfg"]
-    seq0 = k.output(0)["cfg_seq"]
     eid = k.patch([{"path": "domain.cfl", "value": 0.5},
                    {"path": "mesh.dx", "value": 2e-8}])
-    d = _wait_apply(k, seq0)
+    assert _wait_idle(k)
+    d = k.output(0)
     assert (d.get("cfg") or {}).get("domain", {}).get("cfl") == 0.5
     assert (d.get("cfg") or {}).get("mesh", {}).get("dx") == 2e-8
     assert d.get("origin") == "patch", d.get("origin")
@@ -868,7 +829,8 @@ def test_patch_rejects_unknown_verb_and_bad_remove(tmp_path):
     k.submit("from genie.core.simulate import Simulation\n"
              "f = Simulation(client=None)\n"
              "f.domain.total_time = 6e-14\n")
-    before = _wait_cfg(k)          # 等 cfg 真落地（_wait_idle 有竞态，见该函数）
+    assert _wait_idle(k)
+    before = k.output(0)["cfg"]
 
     k.patch([{"verb": "insert", "path": "monitor", "value": {}}])
     text = _wait_text(k, "未知 verb")
@@ -878,6 +840,36 @@ def test_patch_rejects_unknown_verb_and_bad_remove(tmp_path):
     text = _wait_text(k, "下标越界")
     assert "下标越界" in text, text[-300:]
     assert (k.output(0)["cfg"] or {}) == before, "两次都该整批拒、模型不动"
+
+
+def test_attach_ack_does_not_clear_busy(tmp_path):
+    """控制面回执（attach/bind 的 ack）不得把在途 exec 标成空闲（G71）。
+
+    曾经的形状：worker 用同一条 `done` 回 attach，manager 把"收到 done"当成
+    "当前 op 完成"——于是一次换凭据就能让 `busy` 变 False：停止钮消失、
+    `stop()` 返回 False、所有"等不忙"的消费者（GUI / agent / 测试）提前读到
+    旧模型。现在 `busy` 是在途 op 账本的投影，只有**自己那号** done 才销账。
+
+    这里把 attach 排在 exec 前面（attach 先发、exec 紧随），于是 ack 必然在
+    exec 跑着的时候到——正是原来那一拍。
+    """
+    k = SessionKernel(owner="b5attachack")
+    k.attach("k1")                       # 起 worker 并把 attach 排在队首
+    k.submit("import time\ntime.sleep(1.2)\nprint('SLEPT')\n")
+
+    idle_before_output = False
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        out = k.output(0)
+        ran = "SLEPT" in "".join(l["text"] for l in out["lines"]
+                                 if l["kind"] != "input")   # 排除输入回显
+        if not out["busy"]:
+            idle_before_output = not ran
+            break
+        time.sleep(0.02)
+
+    assert not idle_before_output, "attach 的 ack 把正在跑的 exec 标成空闲了（G71）"
+    assert ran, "脚本没跑完就结束了等待"
 
 
 def test_replace_swaps_whole_model(tmp_path):
