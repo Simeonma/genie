@@ -144,10 +144,8 @@
   --shadow-1: 0 1px 2px rgba(16, 21, 26, 0.06);
   --shadow-2: 0 6px 18px rgba(16, 21, 26, 0.10), 0 1px 3px rgba(16, 21, 26, 0.06);
   --shadow-3: 0 16px 44px rgba(16, 21, 26, 0.16), 0 2px 6px rgba(16, 21, 26, 0.08);
-  /* 布局 */
-  --nav-width: 224px;
-  --config-width: 384px;
-  --json-width: 432px;
+  /* 布局（层高）——面板/列宽不在这里：尺寸唯一真源 = dock 树
+   * （modules/dock.js）+ #struct-panel 内部 42:58，见「Dock 工作台内核」节 */
   --topbar-height: 44px;
   --tabbar-height: 34px;
   --ribbon-height: 62px;
@@ -358,7 +356,6 @@ button:not(:disabled):active,.tool-btn:not(:disabled):active,.tb-btn:not(:disabl
 
 /* ══ Col 2: config ══ */
 #config-panel {
-  width: var(--config-width); min-width: var(--config-width);
   background: var(--bg-secondary);            /* L1 白纸 */
   border-right: 1px solid var(--border);
   overflow-y: auto; overflow-x: hidden;
@@ -367,7 +364,8 @@ button:not(:disabled):active,.tool-btn:not(:disabled):active,.tb-btn:not(:disabl
 #config-panel::-webkit-scrollbar-thumb:hover,#json-panel::-webkit-scrollbar-thumb:hover,.pycode::-webkit-scrollbar-thumb:hover { background: var(--border); }
 
 /* ══ 检查器 · Settings Window v2（08-31bv 布局统一标准） ═══
- * 标准宽度 = var(--config-width) = 400px
+ * 中栏宽度不在这里定（唯一真源 = dock 树 + #struct-panel 内部 42:58，见
+ * 「Dock 工作台内核」节）：本节只管子元素**在这条宽度内**如何排布。
  * 规则: ① 任何子元素不得横向溢出 ② label 固定宽, ellipsis
  * ③ input flex-1 平分剩余 ④ 向量(2/3输入) 自动等分
  * ⑤ 单位提示 flex-shrink:0 最多 44px ⑥ 行高 38px 底线式 */
@@ -672,7 +670,7 @@ input::placeholder,textarea::placeholder {
  * 2026-10-11 站长裁决：VS Code 式单面终端——dock 是唯一滚动面，
  * 输入行=滚动面末行（无分隔框），不再是上下两个块。 */
 #term-dock {
-  flex: 1 1 auto; min-height: 0; flex-shrink: 1; overflow: hidden;   /* 滚动只在输出区——标题栏钉死 */
+  min-height: 0; overflow: hidden;   /* 滚动只在输出区——标题栏钉死 */
   display: flex; flex-direction: column;
   border-top: none; background: var(--bg-secondary);   /* L1 白纸（与脚本面板同面） */
 }
@@ -750,7 +748,7 @@ input::placeholder,textarea::placeholder {
 
 /* ══ Col 3: 3D scene ══ */
 #scene-panel {
-  flex: 1; position: relative; overflow: hidden; min-width: 320px;
+  position: relative; overflow: hidden;
   display: flex; flex-direction: column;
   /* 图形窗背景（2026-10-21）：线性渐变改成「顶部受光的非对称径向」——
    * 中心偏上最亮、四周渐冷，物件读作浮在光场里而不是贴在纸上。 */
@@ -824,7 +822,7 @@ input::placeholder,textarea::placeholder {
 #three-container { width: 100%; height: 100%; position: relative; }
 /* ══ Visualize 模块（2026-10 站长裁决：Plot 升格为同级面板）══ */
 #visualize-panel {
-  flex: 1; min-width: 260px; min-height: 0;
+  min-height: 0;
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--bg-secondary);
   border-left: 1px solid var(--border-soft);
@@ -946,7 +944,13 @@ button.files-del { padding: 1px 8px; font-size: var(--fs-xs); }
   display: block; max-width: 100%; max-height: 42vh;
   border: 1px solid var(--border-soft); border-radius: var(--radius);
 }
-#three-container canvas { display: block; }
+/* canvas 是替换元素：three.js 把自己量出来的 px 宽写在 inline style 上，于是
+ * "上一帧的布局结果"会作为固有宽喂给 dock 行的 max-content 计算——布局宽度
+ * 反过来决定布局宽度，窄档（≤1359 用 width:max-content）就此把整行撑出视口，
+ * 实测 1024 视口下内容宽 1079（G43 记的 1280 下 1719 同源）。绝对定位让它
+ * 退出固有尺寸计算：尺寸只由容器 + renderer.setSize（ResizeObserver 驱动）
+ * 决定，与父级宽度不再构成回路。 */
+#three-container canvas { display: block; position: absolute; top: 0; left: 0; }
 /* 场景工具条（2026-10-21 重刻）：G36 遗留「白色圆角浮卡 + 圆角图标框」是全屏
  * 最像 SaaS 模板的元素。改为贴右缘的直角色块条——1px 左发丝线、无投影、
  * 无圆角，按钮 30px，on 态 = 淡强调底 + 强调蓝图标（不再三重描边）。 */
@@ -1002,7 +1006,7 @@ button.files-del { padding: 1px 8px; font-size: var(--fs-xs); }
 }
 .scene-domain-hint.hidden { display: none; }
 .scene-domain-hint .sdh-title {
-  font-size: var(--fs-md); color: var(--text-secondary); letter-spacing: 0.02em;
+  font-size: var(--fs-sm); color: var(--text-secondary); letter-spacing: 0.02em;
 }
 .scene-domain-hint .sdh-hint {
   font-size: var(--fs-xs); color: var(--text-muted);
@@ -1042,7 +1046,7 @@ body.auth-locked #v2-conn { background: transparent; }
   z-index: 4;
   display: flex; align-items: center; gap: 8px;
   padding: 6px 8px;
-  background: var(--bg-surface);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: 0 6px 20px rgba(16, 21, 26, 0.10);
@@ -1288,7 +1292,6 @@ body.auth-locked #v2-conn { background: transparent; }
 
 /* ══ Col 4: JSON ══ */
 #json-panel {
-  width: var(--json-width); min-width: var(--json-width);
   background: var(--bg-secondary);            /* L1 白纸 */
   display: flex; flex-direction: column; overflow: hidden;
 }
@@ -1467,7 +1470,6 @@ body.auth-locked #v2-conn { background: transparent; }
 
 /* ══ 场景树 v3 P1（2026-09-scene-editor）：工具栏+实例树+运行坞 ══ */
 #tree-panel {
-  width: var(--nav-width); min-width: var(--nav-width);
   background: var(--bg-secondary);            /* L1 白纸 */
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column; overflow: hidden;
@@ -1810,14 +1812,11 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 /* ── 响应式收窄（P2-5 审计定案）──
  * 支持下限 1280×800：≥1280 无整页横滚、四栏无重叠/无截断；<1280 视为
  * 紧凑降级（整排允许横向滚动兜底，不做重排，排布保持整齐）。
- * 列宽真源只有两处（同一断点后写胜出，这里不再复述数值）：
- *   默认(>1359) 见 :root —— nav 224 / config 384 / json 432
- *   ≤1359      见文件尾「紧凑层」:root —— nav 120 / config 220 / json 260
- * 本节只管断点内的局部收窄（logo 折叠 / scene 最小宽 / 值列宽 / 中栏 padding）。
+ * 列宽不归 CSS 管（唯一真源 = dock 树，见「Dock 工作台内核」节）：本节只管
+ * 断点内的局部收窄（logo 折叠 / 值列宽 / 中栏 padding）。
  * （1360 断点以下 toolbar 已 2 行 → wsbar 高 ~150px，垂直由 body flex 吸收） */
 @media (max-width: 1359px) {
   .logo-full { display: none; }
-  #scene-panel { min-width: 260px; }
   .frow > input[type="text"],.frow > input:not([type]) { flex-basis: 120px; max-width: 120px; }
   .field-err-msg { padding-left: 0; }
   /* Round1-A：窄档收一档中栏 padding，保证 3×48px + label 110px + gap 装得下 */
@@ -2451,19 +2450,21 @@ body.result-mode #tb-run-box {
 }
 
 /* ══ Dock 工作台内核（2026-10-15 站长裁决：五面板模块化；期① splitter+持久化） ══
- * 布局=树（modules/dock.js），此处只管 dock 骨架的呈现：
- * splitter 发丝线 + hover 强调；被收养面板交出固定宽高（原 id 规则的
- * width/min-width 由 .dock-adopted 覆盖——面板尺寸唯一真源 = dock 树）。 */
+ * 布局=树（modules/dock.js），此处只管 dock 骨架的呈现：splitter 发丝线 +
+ * hover 强调。**面板尺寸唯一真源 = dock 树**：被收养面板在 CSS 里不写宽高
+ * 与 flex（G74 收口：旧的一套 id 列宽 + .dock-adopted 的 !important 抑制层
+ * 互为补丁，两半已一起删；判据锁在
+ * tests/sdk/test_single_source_locks.py::test_docked_panel_size_has_one_owner）。 */
 #main-layout.dock-root { overflow: hidden; display: block; }
 .dock-node { display: flex; width: 100%; height: 100%; min-width: 0; min-height: 0; }
 .dock-col { flex-direction: column; }
 .dock-cell { display: flex; min-width: 0; min-height: 0; overflow: hidden; }
 .dock-leaf { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; min-height: 0; }
 .dock-adopted {
-  width: auto !important; min-width: 0 !important;
-  height: auto; flex: 1 1 auto !important;
+  /* 被收养面板的默认姿态：交出尺寸、填满宿主槽位。没有 !important——需要
+   * 压住的东西已经不存在了；再加回裸 id 尺寸会被上面那条锁当场拦下。 */
+  width: auto; min-width: 0; height: auto; flex: 1 1 auto;
 }
-.dock-adopted#term-dock { height: auto; }   /* 出 scene-panel 后高度归 dock 树管 */
 .dock-adopted#files-view { position: static; }  /* 出 scene-stage 后脱离 absolute 定位 */
 .dock-split {
   flex: 0 0 7px; position: relative; z-index: 5;
@@ -2490,8 +2491,10 @@ body.dock-dragging .dock-split { background: rgba(42, 108, 187, 0.06); }
   /* 桌面压平：直角、无框无影——与 3D/Script/Terminal 的 1px 分隔线
    * 语言统一；圆角卡片化只在移动（规则 ④ 统一处理）。 */
 }
-/* 入编后宽度归 flex（42:58 起步，拖拽改 inline flex-basis），
- * 覆盖旧静态列宽（--nav-width/--config-width）与栏间 border */
+/* 入编后宽度归 flex（42:58 起步，拖拽改 inline flex-basis，落
+ * genie.struct.ratio）——**这是这两个容器在 CSS 里的唯一尺寸声明**：
+ * 42:58 是比例真源，148/200 只是比例被挤到极限时的地板（G74 收口时
+ * 删掉的那套静态列宽 token 就是在这条规则下面当死声明的）。 */
 #struct-panel > #tree-panel {
   width: auto; min-width: 148px; flex: 0 0 42%;
   border-right: none; border-radius: 0;
@@ -2683,16 +2686,15 @@ input:focus-visible,textarea:focus-visible { outline: none; }
 }
 .tree-vwin { position: absolute; top: 0; left: 0; right: 0; will-change: transform; }
 
-/* ══ 响应式三层（2026-10 站长裁决：移动端 = dock 退化形态）════════
-   desktop ≥1360 全功能（上方历史档继续生效）；
-   compact 768–1359：dock MIN 收窄（dock.js COMPACT_MIN）+ 列宽解锁；
-   mobile <768：dock 退化为单 stack 全屏 + 底部导航（拖拽/持久化停用，
-   面板 DOM 原件收养纪律不变）。追加在文件尾 = 同特异性下后写胜出。 */
+/* ══ 响应式两档（2026-10 站长裁决：移动端 = dock 退化形态）════════
+   desktop ≥768 全功能（视口宽度只影响默认比例，不再有第二套形态）；
+   mobile <768：dock 退化为单 stack 全屏 + 顶部页签条（拖拽/持久化停用，
+   面板 DOM 原件收养纪律不变）。追加在文件尾 = 同特异性下后写胜出。
 
-/* -- 紧凑层：解锁 dock 前时代锁死的列宽（935px 溢出的元凶）-- */
-@media (max-width: 1359px) {
-  :root { --nav-width: 120px; --config-width: 220px; --json-width: 260px; }
-}
+   dock 的「紧凑层」（COMPACT_MIN + 断点列宽解锁）在 2026-10 case 收敛时已删：
+   它的存在理由（Tree+Inspector 合堆页签）被 #struct-panel 结构合并取代。
+   文件里其余 ≤1359 的媒体块只是窄窗收窄，不是第二套布局。
+   这里原来的「紧凑层 :root 列宽」是死声明（G74），已随列宽 token 一起删除。 */
 
 /* -- 移动层 -- */
 /* 页签选择器置顶（2026-10 站长裁决：选窗标签放上方；移动模式专用条） */

@@ -17,7 +17,6 @@
 body.mobile-mode #three-container { position: relative; }
 
 @media (max-width: 767px) {
-  :root { --nav-width: 0px; --config-width: 0px; --json-width: 0px; }
   #mobile-nav { display: flex; }
   body.mobile-mode .dock-tabs { display: none; }   /* 切换归顶部页签条 */
   body.mobile-mode .dock-head { min-height: 30px; flex-basis: 30px; }
