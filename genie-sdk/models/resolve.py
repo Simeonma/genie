@@ -147,8 +147,9 @@ def _eval_slot(expr: str, path, env, expr_at) -> float:
         v = eval_expr(expr, env)
     except ExprError as e:
         raise ExprError(
-            e.kind, f"{_path_str(path)} 处表达式 {expr!r} 求值失败: {e.msg}"
-        ) from e
+            e.kind,
+            f"{_path_str(path)}: failed to evaluate expression {expr!r}: "
+            f"{e.msg}") from e
     expr_at[tuple(path)] = expr
     return v
 
@@ -164,7 +165,7 @@ def resolve_parameters_detailed(raw: dict) -> tuple[dict, dict]:
             table = resolve_parameter_table(raw_params)
         except ExprError as e:
             raise ExprError(
-                e.kind, f"参数节求值失败: {e.msg}") from e
+                e.kind, f"parameters table evaluation failed: {e.msg}") from e
         out["parameters"] = dict(table)
     else:
         table = {}
@@ -195,9 +196,11 @@ def check_raw_param_keys(data: dict) -> None:
         if not valid_param_name(k):
             raise ExprError(
                 "syntax",
-                f"参数名 {k!r} 非法：须为标识符（字母或下划线开头、"
-                f"仅含字母数字下划线，≤64 字符）——数值字段的表达式槽"
-                f"与 sweep 轴（parameters[name]）都用它引用")
+                f"parameter name {k!r} is invalid: must be an identifier "
+                f"(starting with a letter or underscore, letters/digits/"
+                f"underscores only, <= 64 chars) — it is referenced by "
+                f"expression slots in numeric fields and by sweep axes "
+                f"(parameters[name])")
 
 def validate_resolved(resolved: dict, expr_at: dict) -> SimConfig:
     """求值结果的模型校验（parse_config 与 sweep 逐点校验共用）。
@@ -213,8 +216,8 @@ def validate_resolved(resolved: dict, expr_at: dict) -> SimConfig:
         if loc in expr_at:
             raise ExprError(
                 "guard",
-                f"{_path_str(loc)}: {first['msg']}"
-                f"（表达式 {expr_at[loc]!r} 的求值结果）") from e
+                f"{_path_str(loc)}: {first['msg']} "
+                f"(result of evaluating expression {expr_at[loc]!r})") from e
         raise
 
 
@@ -235,7 +238,7 @@ def validate_for_ui(cfg: dict) -> list[dict]:
     函数存在的理由（DISCIPLINE §5：改判定只改这里）。
     """
     if not isinstance(cfg, dict):
-        return [{"loc": "", "msg": "cfg 须 object（SimConfig JSON）"}]
+        return [{"loc": "", "msg": "cfg must be an object (SimConfig JSON)"}]
     try:
         check_raw_param_keys(cfg)                     # 名字错在求值前拦
         resolved, expr_at = resolve_parameters_detailed(cfg)

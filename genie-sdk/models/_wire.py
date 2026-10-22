@@ -118,7 +118,9 @@ NumOrTensor = Union[float, tuple[float, float, float], list[list[float]]]
 def _check_range(v: tuple[float, float]) -> tuple[float, float]:
     lo, hi = float(v[0]), float(v[1])
     if not (hi > lo) or not (math.isfinite(lo) and math.isfinite(hi)):
-        raise ValueError(f"区间 [{lo}, {hi}] 无效（须 lo < hi 且有限）")
+        raise ValueError(
+            f"range [{lo}, {hi}] is invalid (expected: lo < hi and both "
+            f"finite)")
     return (lo, hi)
 
 
@@ -128,20 +130,24 @@ def _check_tensor_sym(v):
     的主对角>0 口径；非对角允许负——各向异性耦合可负是 L1 定案，物理
     稳定性的 schema 层防线只查主对角>0（正定性由引擎侧负责，同内核）。"""
     if len(v) != 3 or any(len(row) != 3 for row in v):
-        raise ValueError("张量须 3×3（行优先嵌套 list[list[float]]）")
+        raise ValueError(
+            "tensor must be 3x3 (row-major nested list[list[float]])")
     for row in v:
         for x in row:
             if not math.isfinite(x):
-                raise ValueError(f"张量逐元须有限，got {x!r}")
+                raise ValueError(f"tensor elements must be finite, got {x!r}")
     for i in range(3):
         if not v[i][i] > 0:
-            raise ValueError(f"张量主对角须 > 0，got {v[i][i]!r}")
+            raise ValueError(
+                f"tensor main diagonal must be > 0, got v[{i}][{i}]="
+                f"{v[i][i]!r}")
     for i in range(3):
         for j in range(i + 1, 3):
             a, b = v[i][j], v[j][i]
             if abs(a - b) > 1e-6 * max(1.0, abs(a), abs(b)):
                 raise ValueError(
-                    "张量须对称（互易介质：e[i][j] == e[j][i]，相对容差 1e-6）")
+                    "tensor must be symmetric (reciprocal medium: "
+                    "e[i][j] == e[j][i], relative tolerance 1e-6)")
     return v
 
 
@@ -156,7 +162,8 @@ def _check_finite_pos(v):
     for x in (v if isinstance(v, tuple) else (v,)):
         if not (math.isfinite(x) and x > 0):
             raise ValueError(
-                f"须为有限正数（标量 iso 或 3 元对角逐元），got {x!r}")
+                f"must be finite and positive (scalar iso or 3-element "
+                f"diagonal, per element), got {x!r}")
     return v
 
 
@@ -171,7 +178,7 @@ def _check_hex_color(v):
     if s.startswith("#"):
         s = s[1:]
     if len(s) != 6 or any(c not in "0123456789abcdefABCDEF" for c in s):
-        raise ValueError(f"color 须为 '#RRGGBB' 或 'RRGGBB'，got {v!r}")
+        raise ValueError(f"color must be '#RRGGBB' or 'RRGGBB', got {v!r}")
     return "#" + s.upper()
 
 
@@ -183,7 +190,7 @@ def _check_pos(v):
     if v is None:
         return v
     if not v > 0:
-        raise ValueError(f"须 > 0（标量），got {v!r}")
+        raise ValueError(f"must be > 0, got {v!r}")
     return v
 
 
@@ -195,10 +202,13 @@ def _check_dir(v):
         return v
     for x in v:
         if not math.isfinite(x):
-            raise ValueError(f"方向向量逐元须有限，got {x!r}")
+            raise ValueError(
+                f"direction vector elements must be finite, got {x!r}")
     norm = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
     if norm < 1e-15:
-        raise ValueError(f"方向向量须非零（norm≈0 是零向量），got {v!r}")
+        raise ValueError(
+            f"direction vector must be non-zero (norm≈0 is a zero vector), "
+            f"got {v!r}")
     if abs(norm - 1.0) > 1e-12:
         return (v[0] / norm, v[1] / norm, v[2] / norm)
     return (float(v[0]), float(v[1]), float(v[2]))
@@ -217,13 +227,14 @@ def _norm_polarization(v):
     if v is None:
         return [[1.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
     if len(v) != 3:
-        raise ValueError("polarization 须 3 分量")
+        raise ValueError("polarization must have exactly 3 components")
     if all(isinstance(x, (int, float)) for x in v):
         return [[float(x), 0.0] for x in v]
     out = []
     for pair in v:
         if len(pair) != 2:
-            raise ValueError("polarization 复数形式须 [re, im] 对")
+            raise ValueError(
+                "polarization complex form must be [re, im] pairs")
         out.append([float(pair[0]), float(pair[1])])
     return out
 
@@ -247,7 +258,9 @@ class BoundarySpec(_StrictModel):
     @model_validator(mode="after")
     def _check(self):
         if self.kind == "bloch" and self.k is None and not self.from_source:
-            raise ValueError("bloch 边界必须给 k（3 元组，SI）或 from_source=true")
+            raise ValueError(
+                "bloch boundary requires k (3-tuple, SI) or "
+                "from_source=true")
         return self
 
 
@@ -260,7 +273,8 @@ class DomainSpec(_RangeModel):
     def _check_faces(self):
         for face in self.boundary:
             if face not in FACES:
-                raise ValueError(f"未知面 {face!r}，合法值: {FACES}")
+                raise ValueError(
+                    f"unknown face {face!r} (expected one of: {FACES})")
         return self
 
 
@@ -271,10 +285,12 @@ class RefineSpec(_RangeModel):
     @model_validator(mode="after")
     def _check(self):
         if self.factor is None:
-            raise ValueError("refine 须给 factor（int 或 [fx,fy,fz]，均 ≥2）")
+            raise ValueError(
+                "refine requires factor (an int or [fx, fy, fz], each >= 2)")
         fs = [self.factor] * 3 if isinstance(self.factor, int) else list(self.factor)
         if len(fs) != 3 or any(not isinstance(f, int) or f < 2 for f in fs):
-            raise ValueError("factor 须 int≥2 或 3 个 int≥2")
+            raise ValueError(
+                "factor must be an int >= 2 or a list of 3 ints each >= 2")
         return self
 
 
@@ -326,14 +342,17 @@ class PoleSpec(_StrictModel):
     @model_validator(mode="after")
     def _check(self):
         if self.gamma is None:
-            raise ValueError("pole 须给 gamma")
+            raise ValueError("pole requires gamma")
         if self.kind == "lorentz" and self.omega_0 is None:
-            raise ValueError("lorentz pole 须给 omega_0（>0；ω0=0 请用 drude）")
+            raise ValueError(
+                "lorentz pole requires omega_0 > 0 (use drude for "
+                "omega_0=0)")
         if self.kind == "drude" and self.omega_p is None:
-            raise ValueError("drude pole 须给 omega_p（>0）")
+            raise ValueError("drude pole requires omega_p > 0")
         # rank-1 守卫：只有 beta 无 alpha → 422（alpha 必填）
         if self.beta is not None and self.alpha is None:
-            raise ValueError("rank-1 pole 须给 alpha（只有 beta 无 alpha 非法）")
+            raise ValueError(
+                "rank-1 pole requires alpha (beta without alpha is invalid)")
         return self
 
 
@@ -486,9 +505,12 @@ def norm_vertices_pairs(vertices):
             out.append((float("nan"), float("nan")))
         elif x is None or y is None:
             raise ValueError(
-                "vertices 哨兵必须是完整对 [null, null]（单侧 null 非法）")
+                "vertices sentinel must be a complete [null, null] pair "
+                "(a single-sided null is invalid)")
         elif not (math.isfinite(x) and math.isfinite(y)):
-            raise ValueError("vertices 坐标须有限（哨兵请用 [null, null] 对）")
+            raise ValueError(
+                "vertices coordinates must be finite (use [null, null] "
+                "pairs as sentinels)")
         else:
             out.append((float(x), float(y)))
     return out
@@ -571,7 +593,8 @@ class RingZSpec(_StrictModel, _NamedGeo):
     @model_validator(mode="after")
     def _check_radii(self):
         if self.inner_radius >= self.outer_radius:
-            raise ValueError("inner_radius 须 < outer_radius（=0 为实心盘）")
+            raise ValueError(
+                "inner_radius must be < outer_radius (0 = solid disk)")
         return self
 
 
@@ -602,9 +625,11 @@ class PolygonSweptSpec(_StrictModel, _NamedGeo):
         if v is None:
             return v
         if not (math.isfinite(v[0]) and math.isfinite(v[1])):
-            raise ValueError("tilt 分量须有限")
+            raise ValueError("tilt components must be finite")
         if abs(v[0]) > 1000.0 or abs(v[1]) > 1000.0:
-            raise ValueError("tilt 斜率每分量 |v| <= 1000（大倾角会把截面推出域外）")
+            raise ValueError(
+                "tilt slope components must satisfy |v| <= 1000 "
+                "(large tilts push the cross-section out of the domain)")
         return (float(v[0]), float(v[1]))
 
     @model_validator(mode="after")
@@ -715,7 +740,7 @@ class TimeMonSpec(_MonitorMixin):
     @classmethod
     def _f(cls, v):
         if v not in _FIELD_SET:
-            raise ValueError(f"field {v!r} 不在 {_FIELD_SET}")
+            raise ValueError(f"field {v!r} not in {_FIELD_SET}")
         return v
 
 
@@ -728,7 +753,21 @@ class FreqMonSpec(_MonitorMixin):
     @classmethod
     def _f(cls, v):
         if v not in _FIELD_SET:
-            raise ValueError(f"field {v!r} 不在 {_FIELD_SET}")
+            raise ValueError(f"field {v!r} not in {_FIELD_SET}")
+        return v
+
+    @field_validator("freq", mode="before")
+    @classmethod
+    def _fr_shape(cls, v):
+        # 常见 type-mismatch 策展（2026-10 站长裁决：错误消息必须可操作）：
+        # freq 监视器传列表/位置序列时，pydantic 泛化的
+        # "Input should be a valid dictionary" 不指路——这里明说三个命名参数。
+        if not isinstance(v, dict):
+            raise ValueError(
+                "freq: freq monitors require three named params "
+                "(center [Hz], bw [Hz], n [points]) as a dict, e.g. "
+                '{"center": 300e12, "bw": 120e12, "n": 200}; got '
+                f"{type(v).__name__}: {v!r}")
         return v
 
     @field_validator("freq", mode="after")
@@ -738,13 +777,13 @@ class FreqMonSpec(_MonitorMixin):
         bw = v.get("bw", 0.0)
         n = int(v.get("n", 100))
         if center is None or center <= 0:
-            raise ValueError("freq.center 须 > 0（Hz）")
+            raise ValueError("freq.center must be > 0 (Hz)")
         if bw < 0:
-            raise ValueError("freq.bw 须 ≥ 0")
+            raise ValueError("freq.bw must be >= 0")
         if n < 1:
-            raise ValueError("freq.n 须 ≥ 1")
+            raise ValueError("freq.n must be >= 1")
         if center - bw / 2 < 0:
-            raise ValueError("freq.center - bw/2 须 ≥ 0")
+            raise ValueError("freq.center - bw/2 must be >= 0")
         return {"center": float(center), "bw": float(bw), "n": n}
 
 
@@ -757,7 +796,7 @@ class IndexMonSpec(_MonitorMixin):
     @classmethod
     def _f(cls, v):
         if v not in _INDEX_FIELD_SET:
-            raise ValueError(f"field {v!r} 不在 {_INDEX_FIELD_SET}")
+            raise ValueError(f"field {v!r} not in {_INDEX_FIELD_SET}")
         return v
 
 
@@ -808,9 +847,11 @@ class SimConfig(_StrictModel):
         for k in v:
             if not valid_param_name(k):
                 raise ValueError(
-                    f"参数名 {k!r} 非法：须为标识符（字母或下划线开头、"
-                    f"仅含字母数字下划线，≤64 字符）——数值字段的表达式槽"
-                    f"与 sweep 轴（parameters[name]）都用它引用")
+                    f"parameter name {k!r} is invalid: must be an "
+                    f"identifier (starting with a letter or underscore, "
+                    f"letters/digits/underscores only, <= 64 chars) — it "
+                    f"is referenced by expression slots in numeric fields "
+                    f"and by sweep axes (parameters[name])")
         return v
 
     @model_validator(mode="after")
@@ -819,7 +860,10 @@ class SimConfig(_StrictModel):
         for mtype in ("time", "freq", "index"):
             names = [m.name for m in self.monitor if m.type == mtype]
             if len(names) != len(set(names)):
-                raise ValueError(f"{mtype} monitor 存在重名")
+                dups = sorted({n for n in names if names.count(n) > 1})
+                raise ValueError(
+                    f"duplicate {mtype} monitor names: {dups} (monitor "
+                    f"names must be unique within each type)")
         # geometry 显示名唯一（2026-10-21 用户定案）：名字是树/3D 里的身份，
         # 允许重名就等于允许两行同名对象——找不到、删错一个都是实际代价。
         # 未命名（None）不参与查重：多个匿名对象是合法工作流。
@@ -830,14 +874,18 @@ class SimConfig(_StrictModel):
                 continue
             if n in seen:
                 raise ValueError(
-                    f"geometry 名字重复：{n!r}（第 {seen[n]} 个与第 {i} 个对象）"
-                    f"——名字用于树/3D 标识，须唯一")
+                    f"duplicate geometry name: {n!r} (objects {seen[n]} "
+                    f"and {i}) — names identify objects in the tree/3D "
+                    f"view and must be unique")
             seen[n] = i
         # geometry 引用的材料必须存在（build 期同款守卫提前）
         known = {m.name for m in self.materials}
         for g in self.geometry:
             if g.material not in known:
-                raise ValueError(f"geometry 引用了未定义材料 {g.material!r}")
+                raise ValueError(
+                    f"geometry references undefined material "
+                    f"{g.material!r} (expected a name from materials[]: "
+                    f"{sorted(known) if known else 'none defined'})")
         # periodic/bloch 必须同轴成对（显式设置冲突时提前报错）
         b = self.domain.boundary
         pairs = (("x_min", "x_max"), ("y_min", "y_max"), ("z_min", "z_max"))
@@ -847,8 +895,9 @@ class SimConfig(_StrictModel):
                     ok = (other in b and b[other].kind in ("periodic", "bloch"))
                     if not ok:
                         raise ValueError(
-                            f"边界 {a}={b[a].kind} 须与对面 {other} 同设 "
-                            f"periodic/bloch（同轴成对）"
+                            f"boundary {a}={b[a].kind} must be paired with "
+                            f"the opposite face {other} set to periodic/"
+                            f"bloch (same-axis pairs only)"
                         )
         return self
 
@@ -883,8 +932,9 @@ class SweepAxisSpec(_StrictModel):
     def _check_name(cls, v):
         if not valid_param_name(v):
             raise ValueError(
-                f"轴 name {v!r} 非法：须为参数名（标识符，≤64 字符），"
-                f"且必须是基底配置 parameters 键集内的名")
+                f"axis name {v!r} is invalid: must be a parameter name "
+                f"(identifier, <= 64 chars) that exists in the base "
+                f"config's parameters keys")
         return v
 
     @model_validator(mode="after")
@@ -893,22 +943,26 @@ class SweepAxisSpec(_StrictModel):
                  if x is not None]
         if len(given) != 1:
             raise ValueError(
-                "取值三选一互斥：values / linspace / logspace 须恰好给一个"
-                f"（当前给了 {len(given)} 个）")
+                "exactly one of values / linspace / logspace must be "
+                f"given (got {len(given)})")
         for name in ("linspace", "logspace"):
             sp = getattr(self, name)
             if sp is None:
                 continue
             start, stop, n = sp
             if not (math.isfinite(start) and math.isfinite(stop)):
-                raise ValueError(f"{name} start/stop 须有限，got {sp[:2]!r}")
+                raise ValueError(
+                    f"{name} start/stop must be finite, got {sp[:2]!r}")
             if n < 2:
-                raise ValueError(f"{name}.n 须为整数 >= 2，got {n}")
+                raise ValueError(f"{name}.n must be an integer >= 2, got {n}")
             if start == stop:
                 raise ValueError(
-                    f"{name} start==stop=={start} 拒收（单值轴请 values=[x]）")
+                    f"{name} start==stop=={start} is rejected "
+                    f"(use values=[x] for a single-value axis)")
         if self.values is not None and len(self.values) == 0:
-            raise ValueError("values 非空（单值轴给 [x] 一个元素也合法）")
+            raise ValueError(
+                "values must be non-empty (a single-element list [x] is "
+                "valid)")
         return self
 
     def value_list(self) -> list:
@@ -950,7 +1004,8 @@ class SweepSpec(_StrictModel):
         if self.mode == "zip":
             if len(set(lens)) != 1:
                 raise ValueError(
-                    f"zip 模式要求各轴长度相等，got {lens}")
+                    f"zip mode requires all axes to have equal lengths, "
+                    f"got {lens}")
             n_points = lens[0] if lens else 0
         else:
             n_points = 1
@@ -958,9 +1013,8 @@ class SweepSpec(_StrictModel):
                 n_points *= L
         if n_points > MAX_SWEEP_POINTS:
             raise ValueError(
-                f"展开点数 {n_points} 超上限 {MAX_SWEEP_POINTS}"
-                f"（各轴长度 {lens}；可减点数，管理员可用环境变量 "
-                f"FDTD_MAX_SWEEP_POINTS 调整）")
+                f"expanded point count {n_points} exceeds the limit "
+                f"{MAX_SWEEP_POINTS} (axis lengths {lens}; reduce the "
+                f"number of points, or ask the admin to raise "
+                f"FDTD_MAX_SWEEP_POINTS via the environment variable)")
         return self
-
-

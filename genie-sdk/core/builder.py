@@ -60,7 +60,8 @@ def _num(v: Any) -> Any:
         return v
     if isinstance(v, bool) or not isinstance(v, (int, float)):
         raise TypeError(
-            f"期望数值或表达式串，得到 {type(v).__name__}: {v!r}")
+            f"expected a number or an expression string, got "
+            f"{type(v).__name__}: {v!r}")
     return float(v)
 
 
@@ -77,7 +78,8 @@ def _int_slot(v: Any, slot: str) -> Any:
         # 静默 int(3.7)→3 截断会带错误数量语义入配置（min_cells/
         # max_refinement 是整数槽）——在写入口拒，指路传 int。
         raise TypeError(
-            f"{slot} 是整数槽，得到 {type(v).__name__}: {v!r}——请传 int")
+            f"{slot}: integer slot (expected: int, got: "
+            f"{type(v).__name__}: {v!r}) — pass an int")
     return v
 
 
@@ -89,26 +91,31 @@ def _scalar(v: Any) -> Any:
         return float(v) if isinstance(v, float) else int(v)
     if isinstance(v, str):
         return v
-    raise TypeError(f"不支持的配置值类型 {type(v).__name__}: {v!r}")
+    raise TypeError(
+        f"unsupported config value type {type(v).__name__}: {v!r}")
 
 
 def _num_or_tensor(v: Any):
     """标量 | 3 元对角 | 3×3 张量（eps 系用；值即形态，2026-09 全开）。"""
     if isinstance(v, (list, tuple)):
         if not v:
-            raise ValueError("对角入参须 3 元，得到 0 元（空列表不是有效形态）")
+            raise ValueError(
+                "diagonal input must have 3 elements, got 0 (an empty "
+                "list is not a valid form)")
         vals = [_num(x) for x in v] if not (
             isinstance(v[0], (list, tuple))) else None
         if vals is not None:
             if len(vals) != 3:
-                raise ValueError(f"对角入参须 3 元，得到 {len(vals)} 元")
+                raise ValueError(
+                    f"diagonal input must have 3 elements, got {len(vals)}")
             return vals
         if len(v) != 3:
-            raise ValueError(f"张量须 3×3，行数 {len(v)}")
+            raise ValueError(f"tensor must be 3x3, got {len(v)} rows")
         out = []
         for row in v:
             if not isinstance(row, (list, tuple)) or len(row) != 3:
-                raise ValueError(f"张量每行须 3 元，行 {row!r}")
+                raise ValueError(
+                    f"tensor rows must have 3 elements, got row {row!r}")
             out.append([_num(x) for x in row])
         return out
     return _num(v)
@@ -127,7 +134,8 @@ def _cplx(v: Any) -> list[float]:
     if isinstance(v, complex):
         return [v.real, v.imag]
     if isinstance(v, bool) or not isinstance(v, (int, float)):
-        raise TypeError(f"polarization 分量须为数值或 complex: {v!r}")
+        raise TypeError(
+            f"polarization component must be numeric or complex, got {v!r}")
     return [float(v), 0.0]
 
 
@@ -174,9 +182,12 @@ class Domain:
         """face∈FACES；kind∈{pec,pmc,periodic,pml,bloch}；
         pml: layers/kappa_max/order；bloch: k=(kx,ky,kz)/from_source/n_background。"""
         if face not in FACES:
-            raise ValueError(f"未知面 {face!r}，合法值: {FACES}")
+            raise ValueError(
+                f"unknown face {face!r} (expected one of: {FACES})")
         if kind not in BOUNDARY_KINDS:
-            raise ValueError(f"未知边界类型 {kind!r}，合法值: {BOUNDARY_KINDS}")
+            raise ValueError(
+                f"unknown boundary kind {kind!r} "
+                f"(expected one of: {BOUNDARY_KINDS})")
         d: dict[str, Any] = {"kind": kind}
         if kind == "pml":
             for k in ("layers", "kappa_max", "order"):
@@ -214,8 +225,9 @@ class Mesh:
     def refine(self, x_range, y_range, z_range, factor=None,
                growth_rate: float = 1.2) -> "Mesh":
         if factor is None:
-            raise ValueError("refine 须给 factor（int≥2 或 [fx,fy,fz]；"
-                             "或表达式串）")
+            raise ValueError(
+                "refine requires factor (an int >= 2, [fx, fy, fz] with "
+                "each >= 2, or an expression string)")
         if isinstance(factor, str):
             fac: Any = factor          # 表达式串原样上行（服务端求值）
         elif isinstance(factor, (list, tuple)):
@@ -273,16 +285,19 @@ class _Chain:
         def call(*args, **kw):
             if name in self._TUPLE2:
                 if len(args) != 2:
-                    raise TypeError(f"{name}(a, b) 须两个参数")
+                    raise TypeError(f"{name}(a, b) requires 2 arguments")
                 setattr(item, name, [_num(args[0]), _num(args[1])])
             elif name in self._TUPLE3:
                 if len(args) != 3:
-                    raise TypeError(f"{name}(a, b, c) 须三个参数（None 槽=全域）")
+                    raise TypeError(
+                        f"{name}(a, b, c) requires 3 arguments "
+                        f"(None slot = full span)")
                 setattr(item, name,
                         [None if a is None else _num(a) for a in args])
             elif name == "polarization":
                 if len(args) != 3:
-                    raise TypeError("polarization(px, py, pz) 须三个参数")
+                    raise TypeError(
+                        "polarization(px, py, pz) requires 3 arguments")
                 setattr(item, name, [_cplx(a) for a in args])
             elif name == "vertices":
                 # 多边形顶点 [(x, y), ...]——单参数列表原样入 cfg；
@@ -290,7 +305,9 @@ class _Chain:
                 # 起单一实现；JSON 的 [null, null] 与 Python 的
                 # (None, None)/(nan, nan) 对在此统一）
                 if len(args) != 1 or not isinstance(args[0], (list, tuple)):
-                    raise TypeError("vertices([(x, y), ...]) 须单个顶点列表")
+                    raise TypeError(
+                        "vertices([(x, y), ...]) requires a single list "
+                        "of vertices")
                 from ..models import norm_vertices_pairs
                 setattr(item, name,
                         [list(p) for p in norm_vertices_pairs(args[0])])
@@ -300,8 +317,9 @@ class _Chain:
                     alpha=kw.pop("alpha", None), beta=kw.pop("beta", None))
                 if kw:
                     raise TypeError(
-                        f"{name} 不支持的参数: {sorted(kw)}"
-                        "（3元 pole 已移除——用 iso 标量或 rank-1 alpha/beta）")
+                        f"{name}: unsupported kwargs {sorted(kw)} "
+                        "(3-component poles were removed — use iso "
+                        "scalars or rank-1 alpha/beta)")
                 lst_key = "poles" if name in self._POLE_EPS else "mu_poles"
                 lst = getattr(item, lst_key, None)
                 if not isinstance(lst, list):
@@ -329,7 +347,9 @@ class _Chain:
                 setattr(item, "apodize", d)
             elif name == "freq" and self.__dict__["_freq_style"] == "monitor":
                 if len(args) != 3:
-                    raise TypeError("freq(center, bw, n) 须三个参数（Hz, Hz, 点数）")
+                    raise TypeError(
+                        "freq(center, bw, n) requires 3 arguments "
+                        "(Hz, Hz, point count)")
                 setattr(item, "freq", {"center": _num(args[0]),
                                        "bw": _num(args[1]),
                                        "n": _int_slot(args[2], "freq.n")})
@@ -338,7 +358,9 @@ class _Chain:
                     cur = getattr(item, name, None)
                     if not isinstance(cur, dict):
                         if cur is not None:
-                            raise TypeError(f"{name} 已有非 dict 值 {cur!r}，无法合并 kwargs")
+                            raise TypeError(
+                                f"{name} already has a non-dict value "
+                                f"{cur!r}; cannot merge kwargs")
                         cur = {}
                     cur.update({k: _scalar(v) for k, v in kw.items()})
                     setattr(item, name, cur)
@@ -360,7 +382,7 @@ class _Chain:
         求值后重做同一守卫（实证：解析后为零向量的 alpha 被 422 拒）。
         """
         if not isinstance(v, (list, tuple)) or len(v) != 3:
-            raise TypeError(f"{tag} 须 3 元 [x, y, z]")
+            raise TypeError(f"{tag} must be [x, y, z] (3 elements)")
         out = []
         for x in v:
             if isinstance(x, str):
@@ -368,11 +390,14 @@ class _Chain:
                 continue
             if isinstance(x, bool) or not isinstance(x, (int, float)) \
                     or not math.isfinite(x):
-                raise TypeError(f"{tag} 分量须为有限数值或表达式串: {x!r}")
+                raise TypeError(
+                    f"{tag} components must be finite numbers or "
+                    f"expression strings, got {x!r}")
             out.append(float(x))
         if all(not isinstance(x, str) for x in out) \
                 and all(abs(x) < 1e-12 for x in out):
-            raise ValueError(f"{tag} 不能为零向量（rank-1 需方向）")
+            raise ValueError(
+                f"{tag} cannot be a zero vector (rank-1 needs a direction)")
         return out
 
     @staticmethod
@@ -385,28 +410,33 @@ class _Chain:
         def sc(v, tag):
             if isinstance(v, (list, tuple)):
                 raise TypeError(
-                    f"{tag} 收到 3 元列表——3元 pole 已移除(内核 1.4.0)，"
-                    "用 iso 标量或 rank-1(alpha/beta)")
+                    f"{tag} received a 3-element list — 3-component "
+                    f"poles were removed (kernel 1.4.0); use iso "
+                    f"scalars or rank-1 (alpha/beta)")
             return _num(v)
 
         drude = "drude" in name
         if drude:
             if len(args) < 2:
-                raise TypeError(f"{name}(omega_p, gamma) 须两个参数")
+                raise TypeError(f"{name}(omega_p, gamma) requires 2 arguments")
             omega_p = sc(args[0], "omega_p")
             gamma = sc(args[1], "gamma")
             # 表达式串跳过本地值守卫（比不了大小）——服务端求值后 422
             if not isinstance(omega_p, str) and omega_p <= 0:
-                raise ValueError("drude pole 的 omega_p 须 > 0")
+                raise ValueError("drude pole omega_p must be > 0")
             pole = {"kind": "drude", "omega_p": omega_p, "gamma": gamma}
         else:
             if len(args) < 2:
-                raise TypeError(f"{name}(omega_0, gamma, delta_eps=1) 至少两个参数")
+                raise TypeError(
+                    f"{name}(omega_0, gamma, delta_eps=1) requires at "
+                    f"least 2 arguments")
             omega_0 = sc(args[0], "omega_0")
             gamma = sc(args[1], "gamma")
             delta = sc(args[2], "delta_eps") if len(args) > 2 else 1.0
             if not isinstance(omega_0, str) and omega_0 <= 0:
-                raise ValueError("lorentz pole 的 omega_0 须 > 0（ω0=0 请用 drude）")
+                raise ValueError(
+                    "lorentz pole omega_0 must be > 0 (use drude for "
+                    "omega_0=0)")
             pole = {"kind": "lorentz", "omega_0": omega_0, "gamma": gamma,
                     "delta_eps": delta}
         if alpha is not None:
@@ -415,7 +445,9 @@ class _Chain:
                 pole["beta"] = __class__._dir3(beta, "beta")
             # beta 缺省 = alpha：留给服务端（线格式语义），SDK 不补写
         elif beta is not None:
-            raise TypeError("给了 beta 但没给 alpha——rank-1 需 alpha（β 缺省=α）")
+            raise TypeError(
+                "beta given without alpha — rank-1 requires alpha "
+                "(beta defaults to alpha)")
         return pole
 
 
@@ -468,7 +500,8 @@ class Materials:
         的 lorentz 节点。
         """
         if not library or not isinstance(library, str):
-            raise ValueError("add_from_library(library) 须非空字符串")
+            raise ValueError(
+                "add_from_library(library) requires a non-empty string")
         from . import material as gm  # lazy：import genie 不背 scipy 面
 
         wl, n_arr, k_arr = gm.load_library_nk(library)
@@ -478,8 +511,8 @@ class Materials:
         node = res["material_node"]
         if node is None:
             raise ValueError(
-                f"库材料 {library!r} 拟合未产出可用的 lorentz 节点: "
-                + "; ".join(res["warnings"]))
+                f"library material {library!r} fit produced no usable "
+                f"lorentz node: " + "; ".join(res["warnings"]))
         item = LorentzMatSpec.model_construct(**node)
         self._list.append(item)
         return _Chain(item)

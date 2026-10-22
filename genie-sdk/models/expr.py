@@ -112,7 +112,7 @@ class ExprError(ValueError):
 
 def _check_finite(v: float, ctx: str) -> float:
     if not math.isfinite(v):
-        raise ExprError("math", f"{ctx} 结果非有限（{v!r}）")
+        raise ExprError("math", f"{ctx} produced a non-finite result ({v!r})")
     return v
 
 
@@ -134,9 +134,11 @@ def _apply_bin(op, a: float, b: float, ctx: str) -> float:
     try:
         v = op(a, b)
     except ZeroDivisionError:
-        raise ExprError("math", f"{ctx} 除零/模零（{a!r} 与 {b!r}）") from None
+        raise ExprError(
+            "math", f"{ctx} division/modulo by zero ({a!r} and {b!r})") from None
     except OverflowError:
-        raise ExprError("math", f"{ctx} 溢出（{a!r} 与 {b!r}）") from None
+        raise ExprError(
+            "math", f"{ctx} overflow ({a!r} and {b!r})") from None
     return _check_finite(v, ctx)
 
 
@@ -144,32 +146,35 @@ def eval_expr(expr: str, env: dict[str, float] | None = None) -> float:
     """白名单求值：expr → float。env = 可引用的参数名表（缺省空）。"""
     env = env or {}
     if not isinstance(expr, str) or not expr.strip():
-        raise ExprError("syntax", "表达式为空或纯空白")
+        raise ExprError("syntax", "expression is empty or whitespace-only")
     try:
         tree = ast.parse(expr, mode="eval")
     except (SyntaxError, ValueError) as e:  # ValueError: NUL 字节等
-        raise ExprError("syntax", f"表达式语法错误: {expr!r}（{e}）") from e
+        raise ExprError(
+            "syntax", f"expression syntax error: {expr!r} ({e})") from e
 
     def fn_of(node: ast.Call):
         if not isinstance(node.func, ast.Name):
             raise ExprError(
                 "illegal_node",
-                f"不允许的函数形态 {type(node.func).__name__}"
-                f"（仅直接调用 abs/min/max/sqrt）")
+                f"unsupported function form {type(node.func).__name__} "
+                f"(only direct calls to abs/min/max/sqrt are allowed)")
         name = node.func.id
         if name not in _FUNCTIONS:
             raise ExprError(
                 "illegal_node",
-                f"不允许的函数 {name!r}（白名单: {sorted(_FUNCTIONS)}）")
+                f"unsupported function {name!r} "
+                f"(whitelist: {sorted(_FUNCTIONS)})")
         if node.keywords:
-            raise ExprError("nonatomic", "函数调用不允许关键字参数")
+            raise ExprError(
+                "nonatomic", "function calls do not accept keyword arguments")
         lo, hi = _FUNCTIONS[name]
         n = len(node.args)
         if not (lo <= n <= hi):
             raise ExprError(
                 "nonatomic",
-                f"{name} 参数个数 {n} 非法（允许 {lo}"
-                + (f"~{hi}" if hi > lo else "") + " 个数值参数）")
+                f"{name} got {n} arguments (expected {lo}"
+                + (f"~{hi}" if hi > lo else "") + " numeric arguments)")
         return name
 
     def ev(node: ast.AST) -> float:
@@ -180,7 +185,8 @@ def eval_expr(expr: str, env: dict[str, float] | None = None) -> float:
             if isinstance(v, bool) or not isinstance(v, (int, float)):
                 raise ExprError(
                     "nonatomic",
-                    f"常量须为数值，got {v!r}（{type(v).__name__}）")
+                    f"constant must be numeric, got {v!r} "
+                    f"({type(v).__name__})")
             return float(v)
         if isinstance(node, ast.Name):
             if node.id in env:
@@ -188,23 +194,25 @@ def eval_expr(expr: str, env: dict[str, float] | None = None) -> float:
             avail = sorted(env)
             raise ExprError(
                 "unknown_name",
-                f"未知名 {node.id!r}"
-                + (f"（可用: {avail}）" if avail else "（环境为空，无可用名）"))
+                f"unknown name {node.id!r}"
+                + (f" (available: {avail})" if avail
+                   else " (environment is empty, no names available)"))
         if isinstance(node, ast.BinOp):
             op_t = type(node.op)
             if op_t not in _BIN_OPS:
                 raise ExprError(
-                    "illegal_node", f"不允许的运算符 {op_t.__name__}")
+                    "illegal_node", f"unsupported operator {op_t.__name__}")
             a = ev(node.left)
             b = ev(node.right)
-            return _apply_bin(_BIN_OPS[op_t], a, b, f"{op_t.__name__} 运算")
+            return _apply_bin(_BIN_OPS[op_t], a, b, f"{op_t.__name__} operation")
         if isinstance(node, ast.UnaryOp):
             op_t = type(node.op)
             if op_t not in _UNARY_OPS:
                 raise ExprError(
-                    "illegal_node", f"不允许的一元运算符 {op_t.__name__}")
+                    "illegal_node",
+                    f"unsupported unary operator {op_t.__name__}")
             v = ev(node.operand)
-            return _check_finite(_UNARY_OPS[op_t](v), "一元运算")
+            return _check_finite(_UNARY_OPS[op_t](v), "unary operation")
         if isinstance(node, ast.Call):
             name = fn_of(node)
             args = [ev(a) for a in node.args]
@@ -214,30 +222,31 @@ def eval_expr(expr: str, env: dict[str, float] | None = None) -> float:
                 if name == "sqrt":
                     if args[0] < 0:
                         raise ExprError(
-                            "math", f"sqrt 负数（{args[0]!r}）")
+                            "math", f"sqrt of a negative number ({args[0]!r})")
                     return _check_finite(math.sqrt(args[0]), "sqrt")
                 return _check_finite(
                     min(args) if name == "min" else max(args), name)
             except (OverflowError, ValueError) as e:
-                raise ExprError("math", f"{name} 数值错误: {e}") from e
+                raise ExprError("math", f"{name} numeric error: {e}") from e
         if isinstance(node, ast.Subscript):
             name = _unit_name(node.slice)
             if name is None:
                 raise ExprError(
                     "illegal_node",
-                    "不允许的节点 Subscript（仅 primary[unit] 单位后缀，"
-                    "unit 为注册单位标识符）")
+                    "unsupported node Subscript (only primary[unit] unit "
+                    "suffixes with a registered unit identifier are "
+                    "allowed)")
             if name not in _UNITS:
                 raise ExprError(
                     "unknown_unit",
-                    f"未知单位 {name!r}（注册表: {sorted(_UNITS)}）")
+                    f"unknown unit {name!r} (registered: {sorted(_UNITS)})")
             v = ev(node.value)
-            return _check_finite(v * _UNITS[name], f"单位 {name!r}")
+            return _check_finite(v * _UNITS[name], f"unit {name!r}")
         raise ExprError(
             "illegal_node",
-            f"不允许的节点 {type(node).__name__}（白名单: "
+            f"unsupported node {type(node).__name__} (whitelist: "
             "Constant/Name/BinOp(+-*/%**)/UnaryOp(+-)/"
-            "Call(abs,min,max,sqrt)/primary[unit] 单位后缀）")
+            "Call(abs,min,max,sqrt)/primary[unit] unit suffix)")
 
     return ev(tree)
 
@@ -257,7 +266,8 @@ def resolve_parameter_table(params: dict) -> dict[str, float]:
             return resolved[name]
         if name in visiting:
             chain = visiting[visiting.index(name):] + [name]
-            raise ExprError("cycle", "参数环: " + "→".join(chain))
+            raise ExprError(
+                "cycle", "parameter cycle: " + " -> ".join(chain))
         raw = params[name]
         if isinstance(raw, str):
             visiting.append(name)
@@ -268,11 +278,15 @@ def resolve_parameter_table(params: dict) -> dict[str, float]:
         elif isinstance(raw, bool) or not isinstance(raw, (int, float)):
             raise ExprError(
                 "nonatomic",
-                f"参数 {name!r} 的值须为数值或表达式字符串，got {raw!r}")
+                f"parameter {name!r} value must be a number or an "
+                f"expression string, got {raw!r}")
         else:
             v = float(raw)
         if not math.isfinite(v):
-            raise ExprError("math", f"参数 {name!r} 求值结果非有限（{v!r}）")
+            raise ExprError(
+                "math",
+                f"parameter {name!r} resolved to a non-finite value "
+                f"({v!r})")
         resolved[name] = v
         return v
 

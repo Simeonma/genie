@@ -146,7 +146,8 @@ def _fit_drude_lorentz(wavelengths, n, k, n_drude=0, n_lorentz=2,
         from scipy.optimize import curve_fit  # lazy: import genie stays scipy-free
     except ImportError as exc:
         raise ImportError(
-            "拟合需要 scipy（curve_fit）——请安装: pip install scipy"
+            "fitting requires scipy (curve_fit) — install it with: "
+            "pip install scipy"
         ) from exc
 
     wavelengths = np.asarray(wavelengths, dtype=float).ravel()
@@ -366,12 +367,14 @@ def _scalar_result(fit, w, n_data, k_data, default_name):
     warnings: list[str] = []
     if not fit.converged:
         warnings.append(
-            "拟合未收敛（curve_fit 达到初始猜测/迭代上限）——极点是当前最优"
-            "尝试而非可信解；建议缩窄 fit_range、减少极点数或加大 maxfev")
+            "fit did not converge (curve_fit hit the iteration cap and "
+            "fell back to the initial guess) — the poles are a best-effort "
+            "attempt, not a trustworthy solution; consider narrowing "
+            "fit_range, reducing the pole count, or raising maxfev")
     if not (fit.eps_inf > 0):
         warnings.append(
-            f"eps_inf={fit.eps_inf!r} ≤ 0，无法转成合法配置节点"
-            "（lorentz 材料要求 eps_inf > 0）")
+            f"eps_inf={fit.eps_inf!r} <= 0, cannot build a valid config "
+            f"node (lorentz materials require eps_inf > 0)")
 
     poles = [_pole_to_node(*p) for p in fit.poles]
     node = None
@@ -384,7 +387,7 @@ def _scalar_result(fit, w, n_data, k_data, default_name):
             _sanity_check_lorentz_node(node)
         except ValueError as e:
             node = None
-            warnings.append(f"拟合结果转配置节点未通过校验: {e}")
+            warnings.append(f"fit result failed config-node validation: {e}")
 
     return {
         "converged": bool(fit.converged),
@@ -537,7 +540,9 @@ def load_library_nk(name, base_url=None, api_key=None, username=None,
     from .nkdata import load_nk_data
 
     if not isinstance(name, str) or not name:
-        raise ValueError("load_library_nk(name) 需要非空字符串库名")
+        raise ValueError(
+            "load_library_nk(name) requires a non-empty string library "
+            "name")
     data = load_nk_data(name)
     if data is not None:
         wl_um, n, k = data
@@ -545,34 +550,40 @@ def load_library_nk(name, base_url=None, api_key=None, username=None,
                 np.asarray(n, dtype=float), np.asarray(k, dtype=float))
     if not allow_remote:
         raise ValueError(
-            f"本地材质库无库名 {name!r}（离线模式不回退 HTTP；"
-            "genie.material.list_library_materials() 可列本地全部库名）")
+            f"library {name!r} not found in the local n-k library "
+            f"(offline mode: no HTTP fallback; "
+            f"genie.material.list_library_materials() lists all local "
+            f"library names)")
     url = base_url or os.environ.get("GENIE_URL")   # 可能为 None——组合根
     # 的 hook（G72 会话代持）还会沿 凭据仓>缺省 链补；这里不预拦。
     fetch = hooks.get("remote_nk_fetch")
     if fetch is None:
         if not url:
             raise ValueError(
-                "load_library_nk 需要 base_url（或设置环境变量 GENIE_URL）——"
-                "无法连接材质库；请先用 genie.connect(...) 指定服务器")
+                "load_library_nk requires base_url (or set the GENIE_URL "
+                "environment variable) — cannot reach the material "
+                "library; call genie.connect(...) first")
         raise RuntimeError(
-            "材质库 HTTP 回退未接线——组合根（genie/__init__）负责注入；"
-            "正常 ``import genie`` 即完成接线")
+            "material library HTTP fallback is not wired — the "
+            "composition root (genie/__init__) injects it; a normal "
+            "`import genie` completes the wiring")
     key = api_key if api_key is not None else os.environ.get("GENIE_API_KEY")
     user = username if username is not None else os.environ.get("GENIE_USERNAME")
     payload = fetch(name, url, key, user, timeout)
     if (not isinstance(payload, dict) or "wavelength_m" not in payload
             or "n" not in payload or "k" not in payload):
         raise ValueError(
-            f"材质库接口对 {name!r} 返回了意外格式: {str(payload)[:200]!r}——"
-            "请确认后端 /api/tools/nk_library 支持 ?name= 返回三列数据")
+            f"material library endpoint returned an unexpected format "
+            f"for {name!r}: {str(payload)[:200]!r} — verify the backend "
+            f"/api/tools/nk_library supports ?name= returning three "
+            f"columns")
     wl = np.asarray(payload["wavelength_m"], dtype=float)
     n = np.asarray(payload["n"], dtype=float)
     k = np.asarray(payload["k"], dtype=float)
     if not (len(wl) == len(n) == len(k)):
         raise ValueError(
-            f"材质库 {name!r} 三列不等长: wavelength_m={len(wl)}, "
-            f"n={len(n)}, k={len(k)}")
+            f"material library {name!r} columns have unequal lengths: "
+            f"wavelength_m={len(wl)}, n={len(n)}, k={len(k)}")
     return (wl, n, k)
 
 

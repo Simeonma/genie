@@ -96,7 +96,8 @@ def test_expand_expression_linkage():
 
 
 def test_expand_bad_axis_name_lists_available():
-    with pytest.raises(SweepExpandError, match="不在基底配置.*可用"):
+    with pytest.raises(SweepExpandError,
+                       match=r"not in base config parameters.*available"):
         validate_sweep_config(SweepSpec.model_validate(
             _spec([1e-9])), _base()) if False else None
         from genie.models import SweepSpec
@@ -112,7 +113,7 @@ def test_expand_point_error_carries_index():
     spec = build_sweep_spec(
         parameters=[{"name": "d", "values": [20e-9, -20e-9]}])
     # mesh.dx = "d/4"：点 2 的 d 为负 → dx 负值守卫拦（点 1 合法）
-    with pytest.raises(SweepExpandError, match="第 2 点"):
+    with pytest.raises(SweepExpandError, match="point 2"):
         validate_sweep_config(SweepSpec.model_validate(spec), base)
 
 

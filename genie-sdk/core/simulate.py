@@ -51,14 +51,14 @@ def _construct_tree(cls: type[BaseModel], data: dict, path: str) -> BaseModel:
     """
     if not isinstance(data, dict):
         raise GenieConfigError(
-            f"load_config: {path} 须 dict（{cls.__name__}），"
-            f"得到 {type(data).__name__}")
+            f"load_config: {path} must be a dict ({cls.__name__}), got "
+            f"{type(data).__name__}")
     fields = cls.model_fields
     unknown = sorted(k for k in data if k not in fields)
     if unknown:
         raise GenieConfigError(
-            f"load_config: {path}（{cls.__name__}）未知字段 {unknown}——"
-            f"合法字段: {sorted(fields)}")
+            f"load_config: {path} ({cls.__name__}) has unknown fields "
+            f"{unknown} (expected one of: {sorted(fields)})")
     out: dict[str, Any] = {}
     for k, v in data.items():
         out[k] = _construct_value(fields[k].annotation, v, f"{path}.{k}")
@@ -97,15 +97,17 @@ def _construct_value(ann: Any, v: Any, path: str) -> Any:
         if disc is not None:
             if disc not in v:
                 raise GenieConfigError(
-                    f"load_config: {path} 缺判别字段 {disc!r}（合法类型见"
-                    f"线格式文档）")
+                    f"load_config: {path} is missing the discriminator "
+                    f"field {disc!r} (see the wire-format docs for "
+                    f"valid types)")
             members = [a for a in get_args(bare)
                        if isinstance(a, type) and issubclass(a, BaseModel)]
             member = select_union_member(members, v[disc])
             if member is None:
                 raise GenieConfigError(
-                    f"load_config: {path}.{disc}={v[disc]!r} 未知——"
-                    f"合法: {[m.model_fields[disc].default for m in members]}")
+                    f"load_config: {path}.{disc}={v[disc]!r} is unknown "
+                    f"(expected one of: "
+                    f"{[m.model_fields[disc].default for m in members]})")
             return _construct_tree(member, v, path)
     return v
 
@@ -127,9 +129,10 @@ def _validate_for_submit(cfg: dict) -> None:
         return
     lines = [(e["loc"] + ": " if e["loc"] else "") + e["msg"]
              for e in errors[:3]]
-    more = f"（共 {len(errors)} 处）" if len(errors) > 3 else ""
+    more = f" ({len(errors)} issues)" if len(errors) > 3 else ""
     raise GenieConfigError(
-        "配置预检未过线格式校验" + more + "：\n  " + "\n  ".join(lines))
+        "config precheck failed wire-format validation" + more + ":\n  "
+        + "\n  ".join(lines))
 
 
 class Simulation:
@@ -183,7 +186,9 @@ class Simulation:
         物、agent/MCP 的提交轨道（spec.execute_tool）都经它进入 SDK 层。
         """
         if not isinstance(cfg, dict):
-            raise TypeError(f"load_config 须 dict（SimConfig JSON），得到 {type(cfg).__name__}")
+            raise TypeError(
+                f"load_config requires a dict (SimConfig JSON), got "
+                f"{type(cfg).__name__}")
         self._cfg = _construct_tree(SimConfig, cfg, "cfg")
         # 重建七个配置对象视图（它们持有 _cfg 子模型的引用）
         self._rebind()
@@ -213,8 +218,9 @@ class Simulation:
         factory = hooks.get("expert_factory")
         if factory is None:
             raise RuntimeError(
-                "expert 面未接线——组合根（genie/__init__）负责注入；"
-                "正常 ``import genie`` 即完成接线")
+                "expert interface is not wired — the composition root "
+                "(genie/__init__) injects it; a normal `import genie` "
+                "completes the wiring")
         return factory(self._client)
 
     @property
@@ -244,12 +250,14 @@ class Simulation:
         手的 resolve + validate，fail-fast；payload 始终原文 dump）。"""
         if self._job_id is not None:
             raise RuntimeError(
-                "本实例已提交（作业 {id}）——修改配置请新建 connect() 实例"
-                .format(id=self._job_id))
+                "this instance was already submitted (job "
+                "{id}) — create a new connect() instance to change the "
+                "config".format(id=self._job_id))
         if getattr(self._cfg.domain, "total_time", None) is None:
             raise RuntimeError(
-                "domain.total_time 缺失（唯一时间定义，SI 秒 >0）——"
-                "先 f.domain.total_time = 6e-14 再提交")
+                "domain.total_time is missing (the single time "
+                "definition, SI seconds > 0) — set f.domain.total_time "
+                "= 6e-14 before submitting")
         cfg = self.to_config()
         _validate_for_submit(cfg)
         self._job_id = self._client.submit(cfg)
@@ -273,8 +281,9 @@ class Simulation:
         """
         if self._job_id is not None and any(v is not None for v in (gpu, timeout_s)):
             raise RuntimeError(
-                "已提交的作业不能再改 gpu/timeout_s（配置已发出）——"
-                "新建 connect() 实例重配")
+                "cannot change gpu/timeout_s after submission (the "
+                "config was already sent) — create a new connect() "
+                "instance and reconfigure")
         if gpu is not None:
             # 卡数语义（RunSpec 校验权威在服务端，SDK 薄层）
             self._cfg.run.gpu = int(gpu)
@@ -349,8 +358,9 @@ class Simulation:
         if config is None:
             config = self.to_config()
         elif not isinstance(config, dict):
-            raise TypeError(f"config 须 dict（SimConfig JSON），得到 "
-                            f"{type(config).__name__}")
+            raise TypeError(
+                f"config must be a dict (SimConfig JSON), got "
+                f"{type(config).__name__}")
         _validate_for_submit(config)
         spec = build_sweep_spec(sweep, parameters, gpus_per_sim=gpus_per_sim,
                                 max_parallel=max_parallel,
@@ -375,10 +385,11 @@ class Simulation:
                 except Exception:  # noqa: BLE001 —— 日志取不到不拦守卫
                     tail = ""
             raise RuntimeError(
-                f"作业未成功完成（state={self.state}），无结果可取。"
-                f"作业 {self._job_id} 以失败终态结束"
-                + (f"，日志尾：\n{tail}" if tail else
-                   "（可用 client.log(job_id) 查看完整日志）"))
+                f"job did not finish successfully (state={self.state}); "
+                f"no results to fetch. Job {self._job_id} ended in a "
+                f"failure state"
+                + (f"; log tail:\n{tail}" if tail else
+                   " (use client.log(job_id) for the full log)"))
         if self._arrays is None:
             import h5py
             import io
@@ -412,7 +423,8 @@ class Simulation:
                 raw = _P(local).read_bytes()
                 return SimData(h5py.File(io.BytesIO(raw), "r"), job_id=jid)
         if jid is None:
-            raise RuntimeError("尚未提交作业——results() 需要 job_id")
+            raise RuntimeError(
+                "no job submitted yet — results() needs a job_id")
         raw = self._client.fetch_result(jid)
         return SimData(h5py.File(io.BytesIO(raw), "r"), job_id=jid)
 
@@ -425,8 +437,8 @@ class Simulation:
             if name is None or getattr(m, "name", None) == name:
                 return m
         raise KeyError(
-            f"找不到 {mtype} 监视器"
-            + (f" {name!r}" if name else "（配置里一个都没有）"))
+            f"{mtype} monitor not found"
+            + (f" {name!r}" if name else " (none defined in the config)"))
 
     def _get_result(self, mtype: str, name: str | None, cls):
         """get_* 公共路径：先核作业终态（未成功直接报，不谈监视器）→
@@ -492,6 +504,7 @@ class Simulation:
         jid = job_id or self._job_id
         if jid is None:
             raise RuntimeError(
-                "无 job_id 可查摘要（实例未提交且未传 job_id）——先 run() "
-                "提交，或显式传 digest(job_id)")
+                "no job_id to query the digest for (instance not "
+                "submitted and no job_id passed) — call run() first, or "
+                "pass digest(job_id) explicitly")
         return self._client.digest(jid)

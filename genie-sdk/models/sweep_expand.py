@@ -57,9 +57,9 @@ def _check_axis_names(sweep: SweepSpec, base: dict) -> None:
     for a in sweep.parameters:
         if a.name not in known:
             raise SweepExpandError(
-                f"轴 name {a.name!r} 不在基底配置 parameters 键集内"
-                + (f"（可用: {available}）" if available
-                   else "（基底配置没有 parameters 节）"))
+                f"axis name {a.name!r} not in base config parameters"
+                + (f" (available: {available})" if available
+                   else " (base config has no parameters section)"))
 
 
 def _first_validation_msg(e: ValidationError) -> str:
@@ -87,8 +87,8 @@ def validate_sweep_config(sweep: SweepSpec, base: dict) -> list[dict]:
             msg = (f"{getattr(e, 'msg', '')}" if isinstance(e, ExprError)
                    else _first_validation_msg(e))
             raise SweepExpandError(
-                f"第 {i} 点（共 {len(points)} 点，轴 {axis_names}）非法："
-                f"{msg}；此前 {i - 1} 点均合法"
+                f"point {i} of {len(points)} (axes {axis_names}) is "
+                f"invalid: {msg}; the first {i - 1} points were valid"
             ) from e
         resolved_points.append(resolved)
     return resolved_points

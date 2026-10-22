@@ -163,7 +163,7 @@ def test_geometry_name_optional():
     dup = {**base, "geometry": [
         {"type": "sphere", "material": "sio2", "radius": 1e-7, "name": "a"},
         {"type": "sphere", "material": "sio2", "radius": 2e-7, "name": "a"}]}
-    with _pytest.raises(ValidationError, match="名字重复"):
+    with _pytest.raises(ValidationError, match="duplicate geometry name"):
         SimConfig.model_validate(dup)
     two_anon = {**base, "geometry": [
         {"type": "sphere", "material": "sio2", "radius": 1e-7},
@@ -208,7 +208,7 @@ def test_boundary_periodic_needs_pair():
     from genie.models import SimConfig
     bad = {**BASE_CFG, "domain": {**BASE_CFG["domain"],
            "boundary": {"z_min": {"kind": "periodic"}}}}
-    with pytest.raises(ValidationError, match="成对"):
+    with pytest.raises(ValidationError, match="must be paired"):
         SimConfig.model_validate(bad)
 
 
@@ -278,7 +278,7 @@ def test_validate_for_ui_catches_bad_param_name():
     from genie.models.resolve import validate_for_ui
     raw = {**BASE_CFG, "parameters": {"1bad": 1}}
     errs = validate_for_ui(raw)
-    assert errs and "参数名" in errs[0]["msg"]
+    assert errs and "parameter name" in errs[0]["msg"]
 
 
 def test_validate_for_ui_carries_config_path():
@@ -302,4 +302,4 @@ def test_submit_precheck_uses_same_verdict():
     raw = {**BASE_CFG, "parameters": {"1bad": 1}}
     with pytest.raises(GenieConfigError) as ei:
         _validate_for_submit(raw)
-    assert "参数名" in str(ei.value)
+    assert "parameter name" in str(ei.value)
