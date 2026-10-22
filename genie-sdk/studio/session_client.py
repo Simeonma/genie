@@ -62,13 +62,19 @@ def check_session_id(session_id: str) -> str:
     return session_id
 
 
-def session_url() -> str:
-    """跨进程形态的会话地址缺省值（env GENIE_SESSION_URL，缺省 :8123）。
+def resolve_owner() -> str:
+    """工作区 owner 的**唯一读取点**（env `GENIE_SCRIPTS_OWNER` 缺省 "local"）。
 
-    本地 ``genie studio`` **不用**这个缺省——它自己起会话、自己把地址注入
-    工厂（O1：不再"探测端口并复用"）。
+    G63 收敛（2026-10-23）：此前 __main__/console/server 三处各自读 env 各自
+    兜底——同一事实三个地址。现在只有这里读，其余位置调本函数。
     """
-    return os.environ.get("GENIE_SESSION_URL", "http://127.0.0.1:8123")
+    return os.environ.get("GENIE_SCRIPTS_OWNER") or "local"
+
+
+def session_url() -> str:
+    """SessionClient 构造的兜省地址（硬编码 :8123——旧形态遗留，无人经 env
+    配置；现行所有调用方要么显式注入地址，要么经门牌 discover）。"""
+    return "http://127.0.0.1:8123"
 
 
 class SessionClient:

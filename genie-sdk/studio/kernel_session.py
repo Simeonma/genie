@@ -71,11 +71,10 @@ def backend() -> str:
 
     客户端从不在请求里指定后端：会话自己知道，worker 据此建 Client。
     这条把"哪个后端"从每条请求里删掉了。
-    解析链：env（GENIE_BACKEND > GENIE_INTERNAL_BACKEND，部署覆盖项）
-    > ~/.genie/credentials.json 的 gateway（凭据仓）> 本机缺省。
+    解析链：env GENIE_BACKEND（部署覆盖项）> 凭据仓 gateway > 本机缺省。
+    （G63 收敛 2026-10-23：旧同义 env GENIE_INTERNAL_BACKEND 已删。）
     """
     return (os.environ.get("GENIE_BACKEND")
-            or os.environ.get("GENIE_INTERNAL_BACKEND")
             or _config_gateway()
             or "http://127.0.0.1:9100").rstrip("/")
 

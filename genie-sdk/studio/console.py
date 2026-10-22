@@ -73,8 +73,9 @@ def run_console(client: SessionClient | None = None, *,
                 owner: str | None = None) -> int:
     """终端 REPL 主循环（会话已由调用方确保在跑）。"""
     import os
+    from .session_client import resolve_owner
     cli = client or SessionClient()
-    owner = owner or os.environ.get("GENIE_SCRIPTS_OWNER") or "local"
+    owner = owner or resolve_owner()
     cursor = 0
     # 对齐当前环位（不重放历史——那是 GUI 终端窗口的职责）
     try:

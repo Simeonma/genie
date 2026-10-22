@@ -113,8 +113,8 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
     ring_of = get_ring or (lambda request: _DEFAULT_RING)
     # B1 按人隔离：req → owner。缺省 = 本地形态固定 owner（M1 遗留：本地
     # 单用户，owner 不跟随登录账号；见 LEDGER）。
-    owner_of = owner_fn or (lambda request: os.environ.get(
-        "GENIE_SCRIPTS_OWNER") or "local")
+    from .session_client import resolve_owner
+    owner_of = owner_fn or (lambda request: resolve_owner())
     key_of = key_fn or (lambda request: req_key(request))
     sess = session or SessionClient()
 

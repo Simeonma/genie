@@ -265,10 +265,13 @@ def result_series(job_id: str, mon: str, field: str,
 
 # ── 唯一网关出口 ────────────────────────────────────────────────
 def _backend() -> str:
-    """解析链：env（部署覆盖项）> ~/.genie/credentials.json gateway（凭据仓）> 本机缺省。"""
+    """解析链：env GENIE_BACKEND（部署覆盖项）> 凭据仓 gateway > 本机缺省。
+
+    （G63 收敛 2026-10-23：旧同义 env `GENIE_INTERNAL_BACKEND` 已删——
+    三仓 grep 零消费者；同名 env 在服务仓指内核后端 :8001，语义不同。）
+    """
     from .kernel_session import _config_gateway
     return (os.environ.get("GENIE_BACKEND")
-            or os.environ.get("GENIE_INTERNAL_BACKEND")
             or _config_gateway()
             or "http://127.0.0.1:9100").rstrip("/")
 
@@ -455,17 +458,3 @@ def serve(port: int = 0, *, host: str = "127.0.0.1",
         socks.extend(getattr(srv, "sockets", None) or [])
     actual = socks[0].getsockname()[1] if socks else port
     return server, actual
-
-
-def main() -> None:
-    import sys
-
-    import uvicorn
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else int(
-        os.environ.get("GENIE_SESSION_PORT", "8123"))
-    workspace_root().mkdir(parents=True, exist_ok=True)
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
-
-
-if __name__ == "__main__":
-    main()

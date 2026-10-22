@@ -151,12 +151,12 @@ def cmd_console(args: argparse.Namespace) -> int:
         rv.write(url=url, token=token)
         cli = SessionClient(url, token=token)
         print(f"· 本机会话已启动（{url}）")
+    from genie.studio.session_client import resolve_owner
     try:
         return run_console(
             cli,
             session_id=(sid or cli.session_id or "default"),
-            owner=(os.environ.get("GENIE_SCRIPTS_OWNER") or cli.owner
-                   or "local"))
+            owner=(cli.owner or resolve_owner()))
     finally:
         if server is not None:
             rv.clear()
