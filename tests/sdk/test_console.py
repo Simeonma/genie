@@ -75,8 +75,9 @@ def test_console_client_only_leaves_external_session_alive(tmp_path):
               "GENIE_SESSION_TOKEN"):
         env.pop(k, None)
     srv = subprocess.Popen(
-        [sys.executable, "-m", "genie.studio.session_service",
-         str(sess_port)],
+        [sys.executable, "-c",
+         f"import uvicorn; from genie.studio.session_service import app; "
+         f"uvicorn.run(app, host='127.0.0.1', port={sess_port})"],
         cwd=_REPO, env=env,
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     base = f"http://127.0.0.1:{sess_port}"
