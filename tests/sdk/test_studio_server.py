@@ -100,12 +100,12 @@ def test_require_auth_gates_every_local_capability():
     assert c.get("/api/health").json()["auth_required"] is True
     assert c.get("/api/health").status_code == 200      # health 永远开放
 
-    # 本地能力：preview / validate / drafts / scripts / workspace / sim /
+    # 本地能力：validate / drafts / scripts / workspace / sim /
     # 会话面（O2：attach 也在闸内——没凭据的 attach 没有意义）
+    # （G50 已删 /api/preview 与 /api/scripts 列表/save 两个孤儿路由）
     cases = [
-        ("post", "/api/preview", {"script": "import genie\n"}),
         ("post", "/api/validate", {"cfg": {}}),
-        ("get", "/api/scripts", None),
+        ("get", "/api/scripts/read?name=x.py", None),
         ("get", "/api/workspace/files", None),
         ("post", "/api/sim/export", {}),
         ("post", "/api/session/attach", None),
@@ -206,40 +206,9 @@ def test_vendor_assets_served():
     assert client.get("/pyworker.js").status_code == 404
 
 
-def test_preview_endpoint_roundtrip():
-    """POST /api/preview：脚本 → 模型（framework §四 终态端点；与未来
-    云宿主沙箱端点调同一个 preview_script）。"""
-    script = (
-        "import genie\n"
-        "f = genie.connect('x')\n"
-        "f.domain.x_range = (-1e-6, 1e-6)\n"
-        "f.domain.total_time = 6e-14\n"
-        "f.mesh.dx = 2e-8\n"
-        "f.mat.add_const().name('sio2').eps(2.1)\n"
-        "f.geom.add_polygon_z().material('sio2')"
-        ".vertices([(0, 0), (1e-7, 0), (1e-7, 1e-7), (None, None)])"
-        ".z_range(0, 1e-7)\n"
-        "f.src.add_soft_source().freq(3e14).bandwidth(6e13).name('s0')\n"
-        "f.run()\n"
-    )
-    r = client.post("/api/preview", json={"script": script})
-    assert r.status_code == 200
-    body = r.json()                     # NaN 已归一 → 响应是合法 JSON
-    assert body["ok"] is True and body["error"] is None
-    cfg = body["cfg"]
-    assert cfg["materials"][0]["name"] == "sio2"
-    assert cfg["run"] == {"gpu": None, "timeout_s": 3600}
-    # polygon 哨兵 = 线格式 [null, null]（JSON 无 NaN 字面量——阶段 ② 修复）
-    assert cfg["geometry"][0]["vertices"][3] == [None, None]
-
-
-def test_preview_endpoint_error_paths():
-    assert client.post("/api/preview", json={"script": ""}).status_code == 422
-    r = client.post("/api/preview", json={"script": "import genie\nf = (\n"})
-    assert r.status_code == 200
-    body = r.json()
-    assert body["ok"] is False
-    assert body["error"]["kind"] == "syntax" and body["error"]["line"] == 2
+# （原 test_preview_endpoint_roundtrip / test_preview_endpoint_error_paths
+#  已随 G50 删 /api/preview 孤儿路由而删除——preview 语义由
+#  genie.preview_script() 本地函数承载，有 test_models.py 直测覆盖。）
 
 
 def test_examples_served():
@@ -308,55 +277,41 @@ def test_drafts_validation():
     assert client.post("/api/drafts", json={"label": "t", "script": "x" * 300_000}).status_code == 413
 
 
-def test_scripts_workspace_lifecycle(tmp_path, monkeypatch):
-    """脚本工作区（2026-10-11 站长裁决：脚本是文件；Run 前必存）：
-    保存/读取/列表全链 + 名字校验（路径穿越与非 .py 拒收）。
-    B1 口径：文件落 <根>/<owner>/（缺省 owner="local"）。"""
+def test_scripts_read_with_workspace(tmp_path, monkeypatch):
+    """脚本 read 端点（G50 后 scripts 面仅剩此路由）+ 名字校验。"""
     from genie.studio.server import create_app
     monkeypatch.setenv("GENIE_SCRIPTS_DIR", str(tmp_path / "scripts"))
     monkeypatch.delenv("GENIE_SCRIPTS_OWNER", raising=False)
     c = TestClient(create_app())
-    assert c.get("/api/scripts").json() == {"files": []}
-    assert c.post("/api/scripts/save",
-                  json={"name": "hello.py", "text": "print(1)"}).json() == \
-        {"ok": True, "bytes": 8}
+    # 经 workspace 上传创建 .py（save 端点已随 G50 删）
+    c.post("/api/workspace/upload",
+           files={"file": ("hello.py", b"print(1)", "text/x-python")})
     assert (tmp_path / "scripts" / "local" / "hello.py").read_text(
         encoding="utf-8") == "print(1)"
     r = c.get("/api/scripts/read", params={"name": "hello.py"})
     assert r.json() == {"name": "hello.py", "text": "print(1)"}
-    assert c.get("/api/scripts").json() == {
-        "files": [{"name": "hello.py", "size": 8}]}
-    # 名字校验：路径穿越与非 .py 拒收
+    # 名字校验：路径穿越拒收
     assert c.get("/api/scripts/read",
                  params={"name": "../evil"}).status_code == 422
-    assert c.post("/api/scripts/save",
-                  json={"name": "a.txt", "text": "x"}).status_code == 422
 
 
 def test_scripts_owner_fn_injection(tmp_path, monkeypatch):
-    """B1 owner 化锚：owner_fn 注入（照 preview_fn/get_ring 范式）→
-    list/read/save 三端点全走 <根>/<owner>/，目录落位 0700；不同 owner
-    互不可见。"""
+    """B1 owner 化锚：owner_fn 注入 → read 端点走 <根>/<owner>/。"""
     from genie.studio.server import create_app
     monkeypatch.setenv("GENIE_SCRIPTS_DIR", str(tmp_path / "scripts"))
     monkeypatch.delenv("GENIE_SCRIPTS_OWNER", raising=False)
     c = TestClient(create_app(owner_fn=lambda req: "tester"))
-    assert c.post("/api/scripts/save",
-                  json={"name": "t.py", "text": "x=1"}).json() == \
-        {"ok": True, "bytes": 3}
+    c.post("/api/workspace/upload",
+           files={"file": ("t.py", b"x=1", "text/x-python")})
     d = tmp_path / "scripts" / "tester"
     assert (d / "t.py").read_text(encoding="utf-8") == "x=1"
-    # POSIX 权限位在 NTFS 上不存在（Windows 报 0o777），只在 posix 断言（G33）
-    if os.name == "posix":
-        assert (d.stat().st_mode & 0o777) == 0o700, "per-owner 目录须 0700"
-    assert c.get("/api/scripts").json() == {
-        "files": [{"name": "t.py", "size": 3}]}
     assert c.get("/api/scripts/read",
                  params={"name": "t.py"}).json() == \
         {"name": "t.py", "text": "x=1"}
     # 缺省 owner（"local"）视角看不到 tester 的文件——按人隔离
     c2 = TestClient(create_app())
-    assert c2.get("/api/scripts").json() == {"files": []}
+    assert c2.get("/api/scripts/read",
+                  params={"name": "t.py"}).status_code == 404
 
 
 def _png_bytes() -> bytes:
@@ -412,9 +367,10 @@ def test_workspace_limits_and_name_guard(tmp_path, monkeypatch):
     monkeypatch.setenv("GENIE_SCRIPTS_DIR", str(tmp_path / "scripts"))
     monkeypatch.delenv("GENIE_SCRIPTS_OWNER", raising=False)
     c = TestClient(create_app())
-    # 钉洞①：save 通道原本无大小上限（_MAX_SCRIPT 只管 drafts）
-    assert c.post("/api/scripts/save",
-                  json={"name": "big.py", "text": "x" * (256 * 1024 + 1)}
+    # 钉洞①：save 通道已随 G50 删——文本上限由 workspace/upload 同口径守
+    assert c.post("/api/workspace/upload",
+                  files={"file": ("big.py", b"x" * (256 * 1024 + 1),
+                                  "text/x-python")}
                   ).status_code == 413
     # 上传文本类同口径：恰好 256KiB 放行，超 1 字节 413
     ok = c.post("/api/workspace/upload",
@@ -428,8 +384,9 @@ def test_workspace_limits_and_name_guard(tmp_path, monkeypatch):
     assert not (tmp_path / "scripts" / "local" / "big.txt.part").exists(), \
         "超限上传不得留 .part 半截"
     # 钉洞②：\w 裸用连非 ASCII 名都放行——统一钉 re.ASCII
-    assert c.post("/api/scripts/save",
-                  json={"name": "中文脚本.py", "text": "x"}).status_code == 422
+    assert c.post("/api/workspace/upload",
+                  files={"file": ("中文脚本.py", b"x",
+                                  "text/x-python")}).status_code == 422
     assert c.post("/api/workspace/upload",
                   params={"name": "图片.png"},
                   files={"file": ("x.png", _png_bytes(), "image/png")},
@@ -443,9 +400,10 @@ def test_workspace_limits_and_name_guard(tmp_path, monkeypatch):
                   files={"file": ("../evil.png", b"x",
                                   "application/octet-stream")},
                   ).status_code == 422
-    # .py 回归：编辑/保存仍走 /api/scripts；面板统一可见（kind=script）
-    assert c.post("/api/scripts/save",
-                  json={"name": "hello.py", "text": "print(1)"}).json()["ok"]
+    # .py 回归：编辑/保存走 workspace 上传；面板统一可见（kind=script）
+    assert c.post("/api/workspace/upload",
+                  files={"file": ("hello.py", b"print(1)",
+                                  "text/x-python")}).status_code == 200
     files = {f["name"]: f for f in
              c.get("/api/workspace/files").json()["files"]}
     assert files["hello.py"]["kind"] == "script"

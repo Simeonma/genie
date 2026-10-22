@@ -133,7 +133,7 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
     # ── 登录闸（站长裁决 2026-10-21：未登录什么都不给做）──
     # 只拦"本地能力"前缀；静态资源与 /api/auth/* 必须放行，否则登录页
     # 自己都加载不出来。
-    _GATED_PREFIX = ("/api/preview", "/api/validate", "/api/drafts",
+    _GATED_PREFIX = ("/api/validate", "/api/drafts",
                      "/__drafts", "/api/scripts", "/api/workspace",
                      "/api/sim", "/api/exec", "/api/session")
 
@@ -175,25 +175,6 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
         from genie.models.resolve import validate_for_ui
         errors = await run_in_threadpool(validate_for_ui, cfg)
         return {"ok": not errors, "errors": errors}
-
-    # ══ preview：脚本 → 模型（零网络捕获；GUI 现在走会话，端点为工具/
-    #    外部/agent 保留）════════════════════════════════════════════
-    @app.post("/api/preview")
-    async def api_preview(req: Request) -> dict:
-        body = await req.json()
-        script = body.get("script")
-        if not isinstance(script, str) or not script.strip():
-            raise HTTPException(status_code=422, detail="script 必须是非空文本")
-        out = await run_in_threadpool(preview, script)
-        # resolved 显示副本（阶段 5②）：表达式槽→数值，浏览器零求值；
-        # cfg 恒为原文本体；解析失败省略此键，GUI 回退 cfg。
-        if isinstance(out, dict) and out.get("ok"):
-            try:
-                from genie.models.resolve import resolve_parameters
-                out["resolved"] = resolve_parameters(out.get("cfg") or {})
-            except Exception:  # noqa: BLE001
-                pass
-        return out
 
     # ══ SDK → Studio 实时通道（ring 可注入：本地共享 / 宿主按会话）═══
     @app.post("/api/drafts")
@@ -337,14 +318,6 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
                   ".h5": "application/x-hdf5",
                   ".json": "application/json", ".txt": "text/plain"}
 
-    @app.get("/api/scripts")
-    async def scripts_list(req: Request) -> dict:
-        files = sorted(
-            ({"name": p.name, "size": p.stat().st_size}
-             for p in _owner_scripts_dir(req).glob("*.py")),
-            key=lambda f: f["name"])
-        return {"files": files}
-
     @app.get("/api/scripts/read")
     async def scripts_read(req: Request, name: str) -> dict:
         p = _workspace_file(_owner_scripts_dir(req), name, ("py",),
@@ -352,19 +325,6 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
         if not p.is_file():
             raise HTTPException(status_code=404, detail="脚本不存在")
         return {"name": name, "text": p.read_text(encoding="utf-8")}
-
-    @app.post("/api/scripts/save")
-    async def scripts_save(req: Request) -> dict:
-        body = await req.json()
-        p = _workspace_file(_owner_scripts_dir(req), str(body.get("name") or ""),
-                            ("py",), detail="文件名须为 xxx.py（字母/数字/_/-）")
-        text = str(body.get("text") or "")
-        # B3 钉洞①：save 通道原本无大小上限（_MAX_SCRIPT 只用于 drafts）。
-        if len(text.encode("utf-8")) > _MAX_SCRIPT:
-            raise HTTPException(status_code=413,
-                                detail="script 超 256KiB 上限")
-        p.write_text(text, encoding="utf-8")
-        return {"ok": True, "bytes": len(text.encode("utf-8"))}
 
     # ── 工作区文件面板（B3/B4）：脚本 + savefig 图片 + 数据文件统一列、
     # 看、传、下。与 /api/scripts 同款认证；owner 一律 owner_fn(req)。
