@@ -50,7 +50,13 @@
 /* ══ 细滚动条（2026-10-21）══
  * Chromium 默认 15px 灰槽 + 立体滑块，是浅色仪器界面里最像"网页"的一处。
  * 统一收成 11px 槽 / 5px 圆角滑块（发丝灰），hover 才加深。 */
-* { scrollbar-width: thin; scrollbar-color: var(--border-raise) transparent; }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-raise) transparent;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 ::-webkit-scrollbar { width: 11px; height: 11px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -81,7 +87,6 @@
 :root {
   /* ══ GENIE Studio 设计系统 v2（2026-10-21 定基；实现即本文件）
      : 三层面 · 一强调 · 三墨阶 · 4px 栅格 ══ */
-
   /* 面层次: L0 画布(灰桌) / L1 工作面(白纸) / L2 浮层
    * 画布与白纸必须同屏可辨（旧 #F3F4F6 与白纸只差 8 级灰，面板边界读不
    * 出来）——2026-10-21 压到 #EFF1F4，工作台读作「白纸浮在灰桌上」。 */
@@ -92,27 +97,30 @@
   --bg-input: #FFFFFF;
   --bg-hover: #EDF0F4;           /* 中性 hover 填充（可点≠选中） */
   --bg-active: #E7EFFA;          /* 选中底（accent 8% 台面） */
-
+  --bg-flash: #FDF3D7;           /* 变更提示闪底（琥珀族） */
   /* 发丝线三级（唯一分层手段）：
    * soft = 面板内部（表头/节带/行间）· border = 面板边界 · raise = 控件描边 */
   --border: #DCE0E6;             /* --c-line */
   --border-soft: #EDEFF2;
   --border-raise: #C3CAD3;       /* 抬升控件描边（比 --border 深一档: 凸起件辨识度） */
   --border-active: #1F62B0;      /* 强调描边 */
-
   /* 墨三阶（2026-10-21 恢复层级：旧值三档全近黑 → 标签与值同重，
    * 面板读作一锅黑。值列近黑、标签中墨、注记浅墨，靠亮度分层不靠字号） */
   --text-primary: #10151A;       /* --c-ink   值 / 标题 / 选中 */
   --text-secondary: #39434E;     /* --c-ink-2 正文 / 标签 / 控件文案 */
   --text-muted: #5E6A76;         /* --c-ink-3 注记 / 单位 / 组标题
                                   * 白底 5.6:1，色带(#F2F4F7)上 5.2:1 ≥4.5 */
-
   /* 唯一强调色 (5% 用量纪律) */
   --accent: #1F62B0;
   --accent-2: #1A518F;                    /* hover 深一档（比 accent 深） */
   --accent-dim: #1F62B0;
   --accent-grad: linear-gradient(180deg, var(--accent-2) 0%, #1F62B0 100%);
-
+  /* 强调色的浅底/描边/光晕（2026-09 归一：与 success/warning/danger 同约定——
+   * soft 0.10 浅底 / line 0.35 描边；glow 独立刻度，只在输入聚焦上用） */
+  --accent-soft: rgba(31, 98, 176, 0.10);    /* 强调·浅底 / hover 微蓝底 */
+  --accent-line: rgba(31, 98, 176, 0.35);    /* 强调·描边 / 光晕 */
+  --accent-glow: rgba(31, 98, 176, 0.18);    /* 输入聚焦 3px 光晕（chat-input） */
+  --focus-ring: #3A424B;                     /* 键盘环：中性(≥4.5:1)，区别于输入蓝 */
   /* 语义色（2026-09 克制色调：与 --accent 蓝同饱和度——绿/红不再鲜艳，
    * 此前自引用 var(--success)/var(--danger) 解析为空、语义色整体失效） */
   --success: #1F7A4D;
@@ -120,7 +128,6 @@
   --danger: #C0392B;
   --info: var(--accent);            /* 信息 = 强调蓝（与 --accent 同值, 具名语义化;
                                     * 此前 info 态直接引用 --accent, 语义不显式） */
-
   /* 语义色 tint（标准化 alpha，L1 收尾：语义色的浅底/描边不再各自硬编码
    * rgba——从一个色值 + 一个 alpha 派生，取代此前鲜亮的 61,214,140 /
    * 244,96,109 / 192,57,43 / 240,180,41 四处散落的旧色） */
@@ -130,16 +137,13 @@
   --danger-line: rgba(192, 57, 43, 0.40);     /* 错误·描边 */
   --warning-soft: rgba(154, 103, 0, 0.10);    /* 警告·浅底 */
   --warning-line: rgba(154, 103, 0, 0.35);    /* 警告·描边 */
-
   /* 类别色（2026-09 L1 重构·方案A 已移除：原 8 个 --c-* 类别色是「七彩拼盘」，
    * 饱和度 20%~100%、明度 53%~75% 各自为政、且 domain/jobs 色相撞车。定案改为
    * 「单色墨 + 选中 accent 蓝高亮」，此后图标不再按类别异色，聚焦感代替花哨。 */
-
   /* 投影: 仅 L2 浮层使用（工作区内零投影——分层由发丝线承担） */
   --shadow-1: 0 1px 2px rgba(16, 21, 26, 0.06);
   --shadow-2: 0 6px 18px rgba(16, 21, 26, 0.10), 0 1px 3px rgba(16, 21, 26, 0.06);
   --shadow-3: 0 16px 44px rgba(16, 21, 26, 0.16), 0 2px 6px rgba(16, 21, 26, 0.08);
-
   /* 布局 */
   --nav-width: 224px;
   --config-width: 384px;
@@ -153,7 +157,6 @@
   --radius-sm: 3px;    /* 控件 */
   --radius-lg: 6px;    /* 浮层（对话框/菜单/抽屉） */
   --radius-xs: 2px;    /* 徽标 / 进度条细条 */
-
   /* 间距栅格（2026-09 L2 收敛：4px 基线。所有 padding/margin/gap
    * 只允许取这些刻度；1px 发丝线、999px 胶囊、50% 圆点除外） */
   --space-0: 2px;
@@ -166,7 +169,6 @@
   --space-8: 32px;
   --space-10: 40px;
   --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-
   /* 动效令牌（2026-09 L3 收敛：唯一 3 个时长 + 1 个缓动。此前 6 种时长
    * 0.12/0.15/0.18/0.2/0.22/var(--dur-slow) 各自为政，收敛为 fast/base/slow） */
   --dur-fast: 120ms;    /* 微交互：hover 色变/图标切换 */
@@ -201,7 +203,6 @@
   --fs-xl: 17px;
   /* 微标题字距（0.08em ≈ 11px 下 0.88px）：全站大写小标题唯一取法 */
   --ls-caps: 0.08em;
-
   /* ══ 场景画布语义色（真源 token 2026-09 Round A：有限色相 · 减绿 · 逐色映射）
    * 纪律：DOM 层真源 = 本块；scene_palette.js 逐色以 0xRRGGBB 同值映射并在注释
    * 标注 token。对象按"物理语义"区分——几何=中性物料/源=信号蓝/监视器=全息青/
@@ -220,8 +221,6 @@
   --scene-label-bg: #F4F8FC;     /* 标签卡 = L2 白浮层 */
   --scene-label-ink: #1C2A38;    /* 标签卡文字深墨 */
 }
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
 
 html,body {
   height: 100%;
@@ -251,6 +250,7 @@ pre,textarea,.si-hint,code { user-select: text; }
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
+  outline-color: var(--accent);
 }
 /* P1-6（2026-09 disabled 四轨收敛）：全 UI 唯一 :disabled 底 ——
  * opacity .45 + cursor not-allowed。此前 .mini/.run-btn/.actions button/
@@ -307,7 +307,11 @@ button:not(:disabled):active,.tool-btn:not(:disabled):active,.tb-btn:not(:disabl
 }
 /* 动作簇：手册=静默文字钮；连接=描边钮（状态点承担「已连接/未连接」语义，
  * 按钮本身不再用实心黑块抢整个顶栏的注意力） */
-.topbar-actions { display: flex; gap: 8px; }
+.topbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 .helplink {
   height: 26px; display: inline-flex; align-items: center;
   color: var(--text-secondary); text-decoration: none; font-size: var(--fs-xs);
@@ -456,17 +460,24 @@ button:not(:disabled):active,.tool-btn:not(:disabled):active,.tb-btn:not(:disabl
  * 28px 定高、12px/600、+0.04em 字距、带 chevron；色带压平为「标题行」而不是
  * 一块灰砖（旧 15px 粗体 + 34px 色块，与左树 11px 组头两套语言）。 */
 .sec-head {
-  font-size: var(--fs-xs); font-weight: 600; color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
   letter-spacing: 0.04em;
-  min-height: 28px; padding: 0 10px 0 8px;
-  user-select: none; flex-shrink: 0;
+  min-height: 28px;
+  padding: 0 10px 0 8px;
+  user-select: none;
+  flex-shrink: 0;
   background: var(--bg-tertiary);
   border-top: 1px solid var(--border-soft);
   border-bottom: 1px solid var(--border-soft);
   border-radius: 0;
   cursor: pointer;
-  display: flex; align-items: center; gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin: 10px 0 6px;
+  transition: background var(--dur-base), color var(--dur-base);
 }
 .sec-head::before {
   content: "▾"; font-size: 10px; color: var(--text-muted);
@@ -474,7 +485,10 @@ button:not(:disabled):active,.tool-btn:not(:disabled):active,.tb-btn:not(:disabl
   display: inline-block; width: 10px; text-align: center;
 }
 .sec-head.collapsed::before { transform: rotate(-90deg); }
-.sec-head:hover { color: var(--text-primary); }
+.sec-head:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
 .pane-body .sec-head:first-child { margin-top: 0; }
 .sec-body { transition: max-height var(--dur-slow) ease-out; }
 
@@ -631,7 +645,11 @@ input::placeholder,textarea::placeholder {
 .card:last-child { border-bottom: none; }
 .card-head {
   display: flex;
-  padding: 8px 0 4px; cursor: default; overflow: hidden;
+  padding: 8px 0 4px;
+  cursor: default;
+  overflow: hidden;
+  gap: 8px;
+  align-items: center;
 }
 .card-title {
   margin-right: auto; font-weight: 600; font-size: var(--fs-sm);
@@ -659,9 +677,15 @@ input::placeholder,textarea::placeholder {
   border-top: none; background: var(--bg-secondary);   /* L1 白纸（与脚本面板同面） */
 }
 #term-out {
-  flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 12px 4px;
-  font: 12.5px/1.75 var(--font-mono); color: var(--text-primary);
-  white-space: pre-wrap; word-break: break-word;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px 4px;
+  font: 12.5px/1.75 var(--font-mono);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
 }
 /* 空态：会话终端未跑过任何东西时，给出安静的一行操作提示
  * （旧值 = 一整块空白白卡，读作「坏了/没加载出来」） */
@@ -699,14 +723,28 @@ input::placeholder,textarea::placeholder {
   background: var(--bg-tertiary);
   margin-top: auto;   /* 提示符钉底：空面/短输出时也在面板底部（VS Code 观感），
                          输出超面板后 auto 归零、随流滚动 */
+  /* 两行输入（站长裁决④）：Shift+Enter 换行，Enter 执行（term.js 原生支持） */
+  align-items: flex-start; padding: 4px 12px 6px; border-top: 1px solid var(--border-soft);
 }
 #term-prompt {
   font: 12px/1.7 var(--font-mono);
-  white-space: pre; user-select: none; padding-top: 1px;
+  white-space: pre;
+  user-select: none;
+  padding-top: 1px;
+  color: var(--accent-2);
+  font-weight: 700;
 }
 #term-in {
   flex: 1;
   caret-color: var(--accent);
+  width: 100%;
+  resize: none;
+  border: none;
+  background: transparent;
+  font: 13px/1.6 var(--font-mono);
+  color: var(--text-primary);
+  outline: none;
+  padding: 0;
 }
 #term-in::placeholder { color: var(--text-muted); }
 
@@ -750,10 +788,16 @@ input::placeholder,textarea::placeholder {
   overflow: hidden; white-space: nowrap;
   font-size: var(--fs-xs); font-family: var(--font-mono); color: var(--text-secondary);
   padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.85); border: 1px solid var(--border-soft);
+  box-shadow: var(--shadow-1); border-radius: 999px;
 }
 #result-chip > span { overflow: hidden; text-overflow: ellipsis; }
-#result-chip a { flex-shrink: 0; }
-#result-chip a { color: var(--accent-2); text-decoration: none; white-space: nowrap; }
+#result-chip a {
+  flex-shrink: 0;
+  color: var(--accent-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
 #result-chip a:hover { text-decoration: underline; }
 /* 运行中进度（方案 A，2026-10-15）：chip 内嵌细进度条 + 百分比/ETA 文本；
  * 色带用 accent 家族两档渐变（与顶栏 logo 同族，勿引外族亮蓝） */
@@ -882,7 +926,12 @@ input::placeholder,textarea::placeholder {
 .files-dl { color: var(--accent-2); text-decoration: none; white-space: nowrap; }
 .files-dl:hover { text-decoration: underline; }
 button.files-del { padding: 1px 8px; font-size: var(--fs-xs); }
-#files-empty { font-size: var(--fs-sm); }
+#files-empty {
+  font-size: var(--fs-sm);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  line-height: 1.7;
+}
 .files-preview {
   flex-shrink: 0; padding: 10px;
   border: 1px solid var(--border-soft); border-radius: var(--radius);
@@ -1220,7 +1269,10 @@ body.auth-locked #v2-conn { background: transparent; }
   font: 13px/1.55 var(--font-mono); padding: 8px 12px;
   transition: border-color var(--dur-base), box-shadow var(--dur-base);
 }
-#chat-input:focus { outline: none; }   /* 仅压全局 :focus-visible 环；border/光晕由尾部「输入焦点 token 归一」组同源覆盖 */
+#chat-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}   /* 仅压全局 :focus-visible 环；border/光晕由尾部「输入焦点 token 归一」组同源覆盖 */
 #chat-input::placeholder { color: var(--text-muted); font-size: var(--fs-sm); }
 /* 发送钮继承 .run-btn 主按钮基类（实心 accent）；此处只写语义差异：
  * 输入行内不收缩（textarea flex:1 吸收余宽） */
@@ -1331,10 +1383,17 @@ body.auth-locked #v2-conn { background: transparent; }
  * textarea 横向滚动时文字滑进数字区=重叠——改独立列，构造上无重叠。
  * 行高与 textarea 同字体同步（12.5px/1.75），scrollTop 经 transform 镜像 */
 #code-gutter {
-  flex: 0 0 40px; width: 40px; overflow: hidden; padding-top: 10px;
-  text-align: right; background: var(--bg-code);
+  flex: 0 0 40px;
+  width: 40px;
+  overflow: hidden;
+  padding-top: 10px;
+  text-align: right;
+  background: var(--bg-code);
   font: 12.5px/1.75 var(--font-mono);
-  font-variant-numeric: tabular-nums; user-select: none;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  color: #3A424B;
+  border-right: 1px solid var(--border-soft);
 }
 #code-gutter .gutter-inner { will-change: transform; padding-right: 9px; }
 
@@ -1434,7 +1493,14 @@ body.auth-locked #v2-conn { background: transparent; }
   white-space: nowrap;
 }
 .tb-box + .tb-box { border-left: 1px solid var(--border-soft); }
-.tb-box-btns { order: 1; display: flex; gap: 2px; align-items: center; flex-wrap: nowrap; }
+.tb-box-btns {
+  order: 1;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex-wrap: nowrap;
+  padding: 0 2px;
+}
 /* Agent 已迁顶栏（2026-10-17 站长裁决）：ribbon 里不再有 Agent 框，
  * 旧 #tb-agent-box / #tb-agent-btns 的框 chrome 与按钮规则一并删除。 */
 /* Geometry 形状钮：8 个一排 34px 方瓦（透明底，hover 浮灰 + 图标转强调）；
@@ -1523,10 +1589,18 @@ body.auth-locked #v2-conn { background: transparent; }
  * 灰蓝 3D 双 play + Run 文案，hover 只浮浅底；主 CTA 的等级改由位置/图标承担。
  * Lumerical 的 Run 也是「方形瓦 + 双三角」图标，只是它用橙/绿；我们换成 slate/蓝。 */
 #bar-run-slot .run-btn {
-  font-weight: 600; height: 30px; align-self: center;
-  padding: 0 10px 0 6px; min-width: 0; gap: 5px;
-  background: none; box-shadow: none; color: var(--text-primary);
-  border-radius: var(--radius-sm); font-size: var(--fs-xs);
+  font-weight: 600;
+  height: 30px;
+  align-self: center;
+  padding: 0 10px 0 6px;
+  min-width: 0;
+  gap: 5px;
+  background: none;
+  box-shadow: none;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.3px;
 }
 #bar-run-slot .run-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 #bar-run-slot .run-btn:active { background: var(--bg-active); }
@@ -1535,7 +1609,12 @@ body.auth-locked #v2-conn { background: transparent; }
 body.result-mode #bar-run-slot .run-btn svg { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 #obj-tree { flex: 1; overflow-y: auto; padding: 6px 0 10px; }   /* 通栏：色带顶到面板边界 */
-.tree-item.active { box-shadow: inset 2px 0 0 var(--accent); }
+.tree-item.active {
+  box-shadow: inset 2px 0 0 var(--accent);
+  background: var(--bg-active);
+  color: var(--text-primary);
+  border-left-color: var(--accent);
+}
 /* Round1（2026-09 类型分组重构）：类型组子行缩进——图标与所在组的
  * 组头文字同导轨，读作「挂在组头之下」；结构子项更深一级。 */
 
@@ -1770,7 +1849,14 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 
 /* 范围 min/max 槽（2026-09 站长裁决：显式 min/max 标签替代裸双输入）
  * 基本形态在此；等宽两列栅格与间距在文件尾「10) 范围 min/max 槽」定稿 */
-.frow .rng { display: inline-flex; align-items: center; }
+.frow .rng {
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 6px;
+  margin-right: 0;
+}
 
 /* ══ ε/μ 三形态（2026-09 提案：iso/对角/张量）══ */
 
@@ -1778,8 +1864,11 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
  * 与 2-4px 的控件刻度打架；改 4px 分段条——段间 1px 发丝线、选中段淡强调底 +
  * 强调字，读作"档位开关"而不是一颗药丸。 */
 .mode-pills {
-  display: inline-flex; border: 1px solid var(--border-raise);
-  border-radius: var(--radius-sm); background: var(--bg-secondary);
+  display: inline-flex;
+  border: 1px solid var(--border-raise);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  align-items: center;
 }
 .mode-pill {
   border: none; background: transparent; color: var(--text-muted);
@@ -1819,11 +1908,8 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 .tagdim { opacity: 0.65; font-weight: 400; text-transform: none; letter-spacing: 0; }
 
 /* ══ 审美打磨 2026-09：折叠=中性块状语言 · 输入=编辑蓝 ══ */
-:root { --focus-ring: #3A424B; }   /* 折叠/动作的键盘环：中性(≥4.5:1，旧 #9aa4b2≈2.5:1 过淡)，区别于输入蓝 */
 
 /* 折叠头 hover 给整行浅块（可点感），不再借输入蓝 */
-.sec-head { transition: background var(--dur-base), color var(--dur-base); }
-.sec-head:hover { background: var(--bg-hover); }
 .sec-head:focus-visible,.tree-group-head:focus-visible,.tree-arrow:focus-visible,.pi-head:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
@@ -1831,7 +1917,10 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 
 /* pole 平铺列表（不再卡中卡） */
 .pole-list { display: flex; flex-direction: column; }
-.poleitem { border-bottom: 1px solid var(--border); }
+.poleitem {
+  border-bottom: 1px solid var(--border);
+  padding: 0 2px 2px;
+}
 .poleitem:last-child { border-bottom: none; }
 .pi-head {
   display: flex; align-items: center; gap: 4px;
@@ -1847,7 +1936,11 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
   border-radius: 999px; padding: 0 7px; font-size: var(--fs-xs);
   color: var(--text-secondary); line-height: 16px;
 }
-.mfield-row { margin: 4px 0; }
+.mfield-row {
+  margin: 4px 0;
+  gap: 4px;
+  align-items: flex-start;
+}
 
 /* ═══════════════ 全界面互动语言统一（2026-09 审计后收敛） ═══════════════
  * 语义分层（角色→形与色）：
@@ -1857,18 +1950,6 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
  *   选中/on 态 = --bg-active 底 + accent-2 字（列表行另加 accent 侧条）
  *   信号(运行/变更/错误) = 独立语义色，不借用选中底/输入蓝
  */
-:root {
-  /* --accent 浅底/描边（2026-09 归一：与 success/warning/danger 同约定——
-   * soft 0.10 浅底 / line 0.35 描边。旧 --accent-soft=0.06 过淡且无 line，
-   * chat-head/toolcard 曾各自硬编码外族亮蓝（GitHub 系），统一挂本组） */
-  --accent-soft: rgba(31, 98, 176, 0.10);    /* 强调·浅底 / hover 微蓝底 */
-  --accent-line: rgba(31, 98, 176, 0.35);    /* 强调·描边 / 光晕 */
-  --accent-glow: rgba(31, 98, 176, 0.18);    /* 输入聚焦 3px 光晕（chat-input；
-                                              * 审计 P2-2：0.10 过弱 → 0.18——不入
-                                              * soft/line 刻度，独立 token 单源） */
-  --bg-flash: #FDF3D7;
-}
-
 /* 键盘环：全界面中性（输入的可编辑感由蓝描边表达，环不抢） */
 *:focus-visible { outline-color: var(--focus-ring); }
 .mode-pill:focus-visible { outline: 2px solid var(--focus-ring); }
@@ -1910,17 +1991,23 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 #chat-input:focus,.verts-editor:focus {
   border-color: var(--border-active);
 }
-#chat-input:focus { box-shadow: 0 0 0 3px var(--accent-glow); }
 
 /* ε/μ 标签与输入同行（2026-09）：短名左对齐，胶囊同排最右
  * R17：gap 与 flat 面板 .frow 一致(4px)，使值列左边缘对齐（label 110 + gap 4 = 114）。 */
-.mfield-row { gap: 4px; }   /* align-items 终值 flex-start 定案于「ε/μ 编辑器比例统一」节 */
-.mfield-row > .tgrid { min-width: 0; max-width: 340px; }
+   /* align-items 终值 flex-start 定案于「ε/μ 编辑器比例统一」节 */
+.mfield-row > .tgrid {
+  min-width: 0;
+  max-width: 340px;
+  flex: none;
+  margin: 0;
+  width: 180px;
+  grid-template-columns: 1.4em repeat(3, minmax(0, 1fr));
+  gap: 3px;
+}
 .mfield-row > .mode-pills { margin-left: auto; }
 /* 顶对齐 / label 行高：站长反馈定案，同值终值规则在「ε/μ 编辑器比例统一」节（旧重复段折叠） */
 
 /* ═══════════ 对象卡头统一语言（2026 · geometry/source/monitor/materials 同构） ═══════════ */
-.card-head { gap: 8px; align-items: center; }
 .card-head .inwrap { flex: 1 1 auto; min-width: 0; }
 /* 身份名输入不吃余量（类型 chip 紧邻名后，删除钮为唯一右锚）；
  * 其余（如行内其它控件）的 .inwrap 仍走 flex:1。
@@ -1928,11 +2015,18 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
  * 被挤成 "co…" 三个字母+省略号）。 */
 .card-head .inwrap.card-name-wrap { flex: 0 1 auto; min-width: 0; }
 .card-head input.card-name {
-  background: transparent; border: 1px solid transparent; color: var(--text-primary);
-  font: 600 13px/1.3 var(--font-ui, inherit); height: 26px; padding: 0 6px;
-  flex: 1 1 auto; width: auto; text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-primary);
+  font: 600 13px/1.3 var(--font-ui, inherit);
+  height: 26px;
+  padding: 0 6px;
+  flex: 1 1 auto;
+  width: auto;
+  text-align: left;
   border-radius: var(--radius-sm);
   transition: background-color var(--dur-fast), border-color var(--dur-fast);
+  font-size: var(--fs-base);
 }
 .card-head input.card-name::placeholder { color: var(--text-muted); font-weight: 400; }
 .card-head input.card-name:hover { border-color: var(--border); background: var(--bg-sunken); }
@@ -1945,7 +2039,11 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 /* 卡头里所有 chip 都不许被压（旧行为：名字输入吃掉整行，第二个 chip 被挤成
  * "s…"）。宽度不够时让名字输入先缩。 */
 .card-head .tag { flex: 0 0 auto; max-width: 132px; }
-.card-head .mini.danger { flex: 0 0 auto; }
+.card-head .mini.danger {
+  flex: 0 0 auto;
+  margin-left: auto;
+  flex-shrink: 0;
+}
 
 /* 渲染风缩略图（previews.js · premium-visual R1）：卡片身份行的 44px 预览。
  * 2026-10-21：去掉底与描边——带框的 56px 方块读作一个"按钮"，而它其实是
@@ -1961,10 +2059,16 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 /* 块头升级为分组带：2026-10-21 统一到全局 .sec-head 刻度（28px / 12px / 600）。
  * 旧覆盖把卡内节头放大到 15px + 34px 色块，与检查器"范围/求解/边界"两套语言。 */
 .card .sec-head {
-  background: var(--bg-tertiary); color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   letter-spacing: 0.04em;
-  font-size: var(--fs-xs); font-weight: 600;
-  min-height: 28px; padding: 0 10px 0 8px; border-radius: 0; margin: 10px 0 6px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  min-height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 0;
+  margin: 10px 0 6px;
+  margin-bottom: 6px;
 }
 .card .sec-head:hover { background: var(--bg-hover); color: var(--text-primary); }
 .card .sec-body { border-left: none; margin: 0 0 6px; padding: 2px 0 6px 0; }
@@ -1982,30 +2086,32 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 }
 
 /* 形态胶囊独立小行（右对齐、紧凑，不与矩阵同行防拉伸） */
-.mfield-pills { padding: 0; }
-.mfield-pills .mode-pills { align-self: flex-start; }
-.mode-pills { align-items: center; }
+.mfield-pills {
+  padding: 0;
+  margin: 2px 0 6px;
+  justify-content: flex-start;
+  padding-left: 114px;
+}
+.mfield-pills .mode-pills {
+  align-self: flex-start;
+  transform: scale(1);
+}
 
 /* ε/μ 编辑器比例统一（2026-09）：label 固定列宽 + 值区固定宽，不随容器飘；
  * align-items:flex-start 顶对齐 = 站长反馈定案（2026-09）——旧 1588-1590 段已折叠 */
-.mfield-row { align-items: flex-start; }
 .mfield-row .flabel {
   text-align: left;
 }
-.mfield-row > .tgrid {
-  flex: none; margin: 0;
+.mfield-row > .tgrid .tcell input {
+  padding: 0 2px;
+  font-size: var(--fs-xs);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
-.mfield-row > .tgrid .tcell input { padding: 0 2px; }
 
 /* ε/μ 编辑器 & pole 统一两栏 & 矩阵与 iso 同宽减重（2026-09，站长"都做"） */
-.mfield-row > .tgrid { width: 180px; }
-.mfield-row > .tgrid .tcell input { font-size: var(--fs-xs); }
-.mfield-row > .tgrid { grid-template-columns: 1.4em repeat(3, minmax(0, 1fr)); }
 
 /* 胶囊行贴块头、更紧凑 */
-.mfield-pills { margin: 2px 0 6px; }
-.mfield-pills .mode-pills { transform: scale(1); }
-.card .sec-head { margin-bottom: 6px; }
 
 /* pole 参数行统一两栏：label 定宽 4.6em + 值 200px（含单位提示） */
 .pi-body .frow > .inwrap { flex: none; width: 200px; }
@@ -2022,8 +2128,6 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
   flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   color: var(--text-secondary); font-weight: 500; line-height: 26px;
 }
-.mfield-row > .tgrid { gap: 3px; }
-.mfield-row > .tgrid .tcell input { text-align: center; font-variant-numeric: tabular-nums; }
 /* R17：材料场单值列统一走 flat 的 130px 紧凑刻度（label.flabel 110px 之后）。
  * 矩阵(.tgrid)/矢量(α、β 多 inwrap) 不命中 :only-of-type，保留自身体系。 */
 .mfield-row > .inwrap:only-of-type,.pi-body .frow > .inwrap:only-of-type {
@@ -2042,11 +2146,8 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 #config-content .pi-body .frow:has(> .inwrap + .inwrap) > .inwrap input {
   flex: 1 1 auto; width: 100%; min-width: 48px; max-width: none;
 }
-.mfield-pills { justify-content: flex-start; padding-left: 114px; }
 .pi-body .frow .mode-pills { margin-left: 0; }   /* pole 形态胶囊随 label 后置，与 kind 值对齐 */
-.poleitem { padding: 0 2px 2px; }
 .pi-body { padding: 4px 2px 10px; }
-.card-head input.card-name { font-size: var(--fs-base); }
 
 /* ═══════════ 全模块审美收敛（2026-09 · 多代理审计后统一） ═══════════
  * 契约重申：数据入口=蓝描边(无底色) · 动作=hover --accent-soft+--accent-2
@@ -2113,7 +2214,6 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 /* 10) 范围 min/max 槽：对齐成等宽两列栅格——min|max 各占 label 后一半，
  *     单位标签列固定、输入列等宽 → 三轴读作一张对齐网格而非三行散点。
  *     基础 .frow gap:4px 保证两槽间最小呼吸；.rng 内 tag 定宽、input 吃余量。 */
-.frow .rng { flex: 1 1 0; min-width: 0; gap: 6px; margin-right: 0; }
 .frow .rng .inwrap { flex: 1 1 auto; min-width: 0; }
 .frow .rng .inwrap input { text-align: right; font-variant-numeric: tabular-nums; }
 .rng-tag { flex: 0 0 auto; font-size: var(--fs-2xs); color: var(--text-muted);
@@ -2122,7 +2222,6 @@ body.result-mode #bar-run-slot .run-btn svg { display: none; }
 /* 11) 卡头统一"身份左 · 动作右"：删除钮为唯一右锚（margin-left:auto），
  *     覆盖 .card-title/.card-head select 自带的 margin-right:auto，避免双
  *     auto 把中间 tags 挤到中缝。source/monitor/geometry 三卡同构。 */
-.card-head .mini.danger { margin-left: auto; flex-shrink: 0; }
 .card-head .card-title,.card-head select { margin-right: 0; }
 
 /* 12) 输入 hover 统一（P1-7 审计补齐：全 css 数据入口 hover 蓝描边仅此两处，
@@ -2233,10 +2332,6 @@ input:focus-visible,select:focus-visible,textarea:focus-visible {
   border-left: 2px solid transparent;
 }
 .tree-item:hover { background: var(--bg-hover); color: var(--text-primary); }
-.tree-item.active {
-  background: var(--bg-active); color: var(--text-primary);
-  border-left-color: var(--accent);
-}
 
 /* 缩进导轨：场景级项(0) / 类型项(1) / 结构子项(2) 逐级 +恒定偏移 */
 
@@ -2464,9 +2559,6 @@ body.dock-dragging-panel .dock-leaf { outline: 1px dashed var(--border-raise); }
  * 的三件套同刻度）已删——布局控件收敛为单一 chip 后，它会把 chip 压得比
  * File/Material 的 32px 钮矮 6px。chip 现直接吃 .tb-btn 的统一刻度（桌面
  * 32 / 紧凑档 28）。 */
-.tb-box-btns { padding: 0 2px; }
-#bar-run-slot .run-btn { letter-spacing: 0.3px; }
-.topbar-actions { align-items: center; }
 
 /* -- 表单 -- */
 #config-content input:focus,#config-content select:focus,.sec-body input:focus,.sec-body select:focus {
@@ -2477,23 +2569,15 @@ body.dock-dragging-panel .dock-leaf { outline: 1px dashed var(--border-raise); }
 
 /* -- 场景 -- */
 
-#result-chip {
-  background: rgba(255, 255, 255, 0.85); border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-1); border-radius: 999px;
-}
 #scene-tools { box-shadow: var(--shadow-1); }
 #scene-panel,#json-panel { border-left: 1px solid var(--border-soft); }
 
 /* -- 脚本面板 -- */
    /* 与 view-tabbar 共基线 */
 
-#code-gutter { color: #3A424B; border-right: 1px solid var(--border-soft); }
 #code-editor::selection { background: rgba(42, 108, 187, 0.18); }
 
 /* -- 终端 -- */
-
-#term-out { line-height: 1.6; }
-#term-prompt { color: var(--accent-2); font-weight: 700; }
 
 /* -- 键帽/徽标/空态 -- */
 kbd {
@@ -2503,7 +2587,6 @@ kbd {
   border-radius: var(--radius-xs); padding: 1px 5px;
 }
 .status-badge,.tree-band .tree-count { border-radius: 999px; font-size: var(--fs-xs); }
-#files-empty { padding: var(--space-6) var(--space-4); text-align: center; line-height: 1.7; }
 
 /* -- 微交互 -- */
 .tb-btn,.mini,.tool-btn,.view-tab,.hdr-btn,.run-btn,.chat-mini,.mode-pill,.tree-item,.dock-tab {
@@ -2515,7 +2598,6 @@ kbd {
 button:disabled svg { opacity: 0.6; }
 a.helplink { color: var(--text-secondary); text-decoration: none; }
 a.helplink:hover { color: var(--accent-2); text-decoration: underline; text-underline-offset: 3px; }
-:focus-visible { outline-color: var(--accent); }
 
 /* ══ dock 统一标题栏（2026-10-15 站长裁决②：全部面板同高同字同一语言）══
  * 2026-10-21 重刻：30px 灰带 + 11px 全大写刻字（.08em）+ 右端 22px 图标动作组。
@@ -2535,12 +2617,6 @@ a.helplink:hover { color: var(--accent-2); text-decoration: underline; text-unde
 .dock-head-actions { margin-left: auto; display: flex; gap: 2px; align-items: center; }
 .dock-head .dock-tab { padding: 4px 12px; margin: 0; }
 /* 终端两行输入（站长裁决④）：Shift+Enter 换行，Enter 执行（term.js 原生支持） */
-#term-in-row { align-items: flex-start; padding: 4px 12px 6px; border-top: 1px solid var(--border-soft); }
-#term-in {
-  width: 100%; resize: none; border: none; background: transparent;
-  font: 13px/1.6 var(--font-mono); color: var(--text-primary);
-  outline: none; padding: 0;
-}
 
 /* 3D 内部页签条：仅剩单页签（无 Plot）时隐藏——页签职责已上收 dock 统一头 */
 #view-tabs.single { display: none; }
