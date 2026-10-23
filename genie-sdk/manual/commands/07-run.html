@@ -341,14 +341,23 @@ f.geom.<span class="fn">add_box</span>().<span class="fn">name</span>(<span clas
 <p>The synchronous entry point: implies submission (serialize + local precheck + POST), polls until a terminal state, then <strong>automatically downloads the results</strong> to <code>&lt;job_id&gt;_results.h5</code> under <code>$GENIE_RESULT_DIR</code> (default <code>./genie_results/</code>; on failure it only warns — <code>results()</code> re-fetches on demand). Returns the <code>Simulation</code> itself (<code>state == "done"</code>), ready for <code>f.get_freq('tr')</code>.</p>
 <div class="tblwrap"><table>
 <thead><tr><th>Param</th><th>Type</th><th>Required</th><th>Default</th><th>Description</th></tr></thead><tbody>
-<tr><td><code>gpu</code></td><td>int</td><td>no</td><td>—</td><td>Number of GPUs (1..4, capped server-side by the <code>max_gpu_per_run</code> quota); <code>None</code>/omitted = single GPU. Device selection, NV-link pairing and axis splitting are scheduled server-side</td></tr>
+<tr><td><code>gpu</code></td><td>int</td><td>no</td><td>—</td><td><strong>Optional upper bound</strong> on GPUs (1..4). The server picks the actual count <span class="mathi"><i>N</i></span> from the model's estimated demand and the machine capacity, then caps it by your <code>max_gpu_per_run</code> quota and by this value. Omit it unless you want to forbid multi-GPU. Which cards, NV-link pairing and axis splitting are the provider's business</td></tr>
 <tr><td><code>timeout_s</code></td><td>int</td><td>no</td><td>3600</td><td>Server-side job timeout (s)</td></tr>
 <tr><td><code>poll_interval</code></td><td>float</td><td>no</td><td>2.0</td><td>Polling interval (s)</td></tr>
 <tr><td><code>progress</code></td><td>callable</td><td>no</td><td>—</td><td>Per-poll callback <code>progress(status_dict)</code></td></tr>
 </tbody></table></div>
 <p>Simulation length is defined solely by <code>domain.total_time</code> (SI seconds, &gt; 0 required) — <code>run()</code> takes <strong>no step argument</strong>; the job advances until the grid's time capacity is reached, and the step count is a read-only derived value (<code>dt</code>/<code>n_steps</code> in <code>summary</code>/<code>results</code>).</p>
 <h3 id="gpu-scheduling-semantics">GPU scheduling semantics</h3>
-<p>Scheduling server-side consists of a free-memory filter over available devices followed by NV-link chain selection. When free GPU memory is insufficient, or no complete NV-link chain can be assembled, the job lands in <strong>FAILED</strong> with an explicit error — there is no silent degradation to fewer GPUs.</p>
+<p>You do not choose cards or how many. Three parties split the decision:</p>
+<p>1. <strong>This SDK</strong> sends the configuration and shows the result. 2. <strong>The service</strong> decides <strong>how many</strong> GPUs (<span class="mathi"><i>N</i></span>): it asks the kernel for the    model's demand curve, takes the smallest <span class="mathi"><i>N</i></span> whose per-rank need fits one    card on that machine, and caps it with your quota and <code>run.gpu</code>. 3. <strong>The provider</strong> (the kernel's lease pool today, a cloud scheduler later)    decides <strong>which</strong> cards and exposes exactly <span class="mathi"><i>N</i></span> of them to the job.</p>
+<p><span class="mathi"><i>N</i></span> is always the fewest cards that fit: any rank topology gives bit-identical results, so extra cards only cost time and money.</p>
+<p>Two failure shapes, deliberately different:</p>
+<ul><li><strong>Model too big for the machine</strong> (even with your cap) → rejected at submit with HTTP 422 and the numbers (<code>need_mib</code> vs the machine's card size).</li><li><strong>No free card right now</strong> → the job waits in the queue and is dispatched when a card frees up (no silent degradation, no failed job).</li></ul>
+<p>Want the numbers before submitting? Ask the kernel (read-only, no job created):</p>
+<pre class="code"><code>c = genie.<span class="fn">connect</span>()
+info = c.<span class="fn">preflight</span>(f.<span class="fn">to_config</span>())      <span class="cm"># see 00-connect / HTTP_API.md</span>
+<span class="kw">if</span> info[<span class="str">&quot;available&quot;</span>]:
+    <span class="fn">print</span>(info[<span class="str">&quot;demand&quot;</span>][<span class="str">&quot;1&quot;</span>], <span class="str">&quot;MiB for one GPU&quot;</span>, info[<span class="str">&quot;grid&quot;</span>][<span class="str">&quot;n_tot&quot;</span>], <span class="str">&quot;cells&quot;</span>)</code></pre>
 <pre class="code"><code>f.<span class="fn">run</span>()                                       <span class="cm"># most common</span>
 f.<span class="fn">run</span>(gpu=<span class="num">2</span>, progress=print)                  <span class="cm"># dual GPU + progress callback</span></code></pre>
 <div class="kv"><span class="kv-k">Common pitfalls</span><span class="kv-v"></span></div>

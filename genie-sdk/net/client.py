@@ -163,6 +163,30 @@ class Client:
         r = self._req("POST", "/api/jobs", ok=(200, 202), json_body=config)
         return r.json()["job_id"]
 
+    def preflight(self, config: dict) -> dict:
+        """需求预检（只读，**不提交作业**）→ 这个模型要多少资源。
+
+        返回 ``{available, cap, caliber, demand{"1"..cap}, grid{n_tot, axes}}``：
+
+        - ``demand[n]`` = n 张卡时**每 rank** 需要多少 MiB（含峰值因子与
+          CUDA context；口径字符串在 ``caliber`` 里，数字自带口径才可对账）；
+        - ``grid`` = 含 PML 的格数 + 三条 1D 格心（单位 µm，内核工作单位）。
+
+        **给几张卡不在这里决定**：内核只报需求，卡数由网关按"等级上限 +
+        需求 ≤ 机型容量"定（G78，见内核 `docs/LEDGER.md`「GPU 归属」）。
+        所以 ``run.gpu`` 只是可选上限，不是卡数。
+
+        老内核没有该端点（404）→ ``{"available": False}``：调用方按"未知"
+        处理，别把它当"装不下"。
+        """
+        r = self._req("POST", "/api/config/preflight", ok=(200, 404),
+                      json_body={"cfg": config})
+        if r.status_code == 404:
+            return {"available": False}
+        body = r.json()
+        body["available"] = True
+        return body
+
     def job_status(self, job_id: str) -> dict:
         return self._req("GET", f"/api/jobs/{job_id}").json()
 

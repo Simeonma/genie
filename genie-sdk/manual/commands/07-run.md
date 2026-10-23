@@ -31,7 +31,7 @@ demand). Returns the `Simulation` itself (`state == "done"`), ready for
 
 | Param | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `gpu` | int | no | — | Number of GPUs (1..4, capped server-side by the `max_gpu_per_run` quota); `None`/omitted = single GPU. Device selection, NV-link pairing and axis splitting are scheduled server-side |
+| `gpu` | int | no | — | **Optional upper bound** on GPUs (1..4). The server picks the actual count `N` from the model's estimated demand and the machine capacity, then caps it by your `max_gpu_per_run` quota and by this value. Omit it unless you want to forbid multi-GPU. Which cards, NV-link pairing and axis splitting are the provider's business |
 | `timeout_s` | int | no | 3600 | Server-side job timeout (s) |
 | `poll_interval` | float | no | 2.0 | Polling interval (s) |
 | `progress` | callable | no | — | Per-poll callback `progress(status_dict)` |
@@ -43,11 +43,33 @@ value (`dt`/`n_steps` in `summary`/`results`).
 
 ### GPU scheduling semantics
 
-Scheduling server-side consists of a free-memory filter over available
-devices followed by NV-link chain selection. When free GPU memory is
-insufficient, or no complete NV-link chain can be assembled, the job
-lands in **FAILED** with an explicit error — there is no silent
-degradation to fewer GPUs.
+You do not choose cards or how many. Three parties split the decision:
+
+1. **This SDK** sends the configuration and shows the result.
+2. **The service** decides **how many** GPUs (`N`): it asks the kernel for the
+   model's demand curve, takes the smallest `N` whose per-rank need fits one
+   card on that machine, and caps it with your quota and `run.gpu`.
+3. **The provider** (the kernel's lease pool today, a cloud scheduler later)
+   decides **which** cards and exposes exactly `N` of them to the job.
+
+`N` is always the fewest cards that fit: any rank topology gives bit-identical
+results, so extra cards only cost time and money.
+
+Two failure shapes, deliberately different:
+
+- **Model too big for the machine** (even with your cap) → rejected at submit
+  with HTTP 422 and the numbers (`need_mib` vs the machine's card size).
+- **No free card right now** → the job waits in the queue and is dispatched
+  when a card frees up (no silent degradation, no failed job).
+
+Want the numbers before submitting? Ask the kernel (read-only, no job created):
+
+```python
+c = genie.connect()
+info = c.preflight(f.to_config())      # see 00-connect / HTTP_API.md
+if info["available"]:
+    print(info["demand"]["1"], "MiB for one GPU", info["grid"]["n_tot"], "cells")
+```
 
 ```python
 f.run()                                       # most common

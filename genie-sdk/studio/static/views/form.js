@@ -1589,91 +1589,14 @@ const FormPanel = {
     if (this.only == null) body.appendChild(addRow);
   },
 
-  /* GPU 三形态控件（2026-09-10 #4）：SDK/后端 run.gpu 早支持
-   * int（单卡编号）/ {"count":k}（k 卡多卡域分解）/ {"devices":[..]}
-   * （指定卡号），但表单只有一个 num 框——dict 形态没有 UI 入口，
-   * 手填会以字符串上行被服务端 422。模式下拉 + 自适应输入框，
-   * 直接写对象进 cfg（dict 形态的线格式口径见 models.RunSpec.gpu）。 */
-  _gpuControl() {
-    const r = this.cfg.run || (this.cfg.run = {});
-    const wrap = this._el("div");
-    wrap.style.cssText = "display:flex;gap:6px;align-items:center;flex:1;min-width:0;";
-    const modeSel = document.createElement("select");
-    modeSel.id = "f-run-gpu-mode";
-    modeSel.name = modeSel.id;
-    modeSel.setAttribute("autocomplete", "off");
-    modeSel.setAttribute("aria-label", "GPU 模式");
-    const MODES = [
-      ["auto", "自动"],
-      ["index", "单卡编号"],
-      ["count", "卡数（多卡）"],
-      ["devices", "指定卡列表"],
-    ];
-    for (const [v, lbl] of MODES) {
-      const o = document.createElement("option");
-      o.value = v; o.textContent = lbl;
-      modeSel.appendChild(o);
-    }
-    const inp = document.createElement("input");
-    inp.type = "text"; inp.inputMode = "numeric";
-    inp.id = "f-run-gpu-value";
-    inp.name = inp.id;
-    inp.setAttribute("autocomplete", "off");
-    inp.style.flex = "1"; inp.style.minWidth = "0";
-    const apply = () => {
-      const mode = modeSel.value;
-      inp.disabled = mode === "auto";
-      inp.placeholder = mode === "index" ? "卡编号，如 0"
-        : mode === "count" ? "卡数，如 2（≥2 即多卡域分解）"
-        : mode === "devices" ? "逗号分隔卡号，如 0,1"
-        : "服务端自动选空闲卡";
-      const t = inp.value.trim();
-      let bad = false;
-      if (mode === "auto") {
-        deletePath(this.cfg, "run.gpu");
-      } else if (t !== "") {
-        if (mode === "index") {
-          const n = parseInt(t, 10);
-          bad = !Number.isInteger(n) || n < 0 || String(n) !== t;
-          if (!bad) setPath(this.cfg, "run.gpu", n);
-        } else if (mode === "count") {
-          const n = parseInt(t, 10);
-          bad = !Number.isInteger(n) || n < 1 || String(n) !== t;
-          if (!bad) setPath(this.cfg, "run.gpu", { count: n });
-        } else {
-          const parts = t.split(",").map(s => s.trim()).filter(s => s !== "");
-          bad = !parts.length
-            || !parts.every(s => /^\d+$/.test(s));
-          if (!bad) setPath(this.cfg, "run.gpu",
-            { devices: parts.map(s => parseInt(s, 10)) });
-        }
-      }
-      inp.style.borderColor = bad ? "var(--danger, #c0392b)" : "";
-      inp.title = bad ? "无法解析（index/count 要非负整数；devices 要逗号分隔非负整数）" : "";
-      this._notifyMutate();
-    };
-    /* 初值：按 cfg.run.gpu 现形反推模式 */
-    const g = r.gpu;
-    if (g === null || g === undefined) modeSel.value = "auto";
-    else if (typeof g === "number") { modeSel.value = "index"; inp.value = String(g); }
-    else if (g && typeof g === "object" && Array.isArray(g.devices)) {
-      modeSel.value = "devices"; inp.value = g.devices.join(",");
-    } else if (g && typeof g === "object" && g.count !== undefined) {
-      modeSel.value = "count"; inp.value = String(g.count);
-    } else modeSel.value = "auto";
-    modeSel.addEventListener("change", apply);
-    inp.addEventListener("input", apply);
-    apply();
-    wrap.appendChild(modeSel);
-    wrap.appendChild(inp);
-    return wrap;
-  },
+  /* GPU 卡数不由用户选（G78 2026-10-25 站长裁决）：内核只报需求、网关按
+   * 等级上限与机型容量决定给几张卡，run.gpu 退化成可选上限。表单因此
+   * 不再提供任何选卡控件——需要抬高上限的走配置文件/脚本。 */
 
   _run(body) {
     // G18 单旋钮：时长唯一在 domain.total_time（domain 节编辑）——run 节
-    // 只剩 GPU 卡数与超时；步数是 build 后派生量，不再有输入框。
+    // 只剩超时；卡数由系统定（G78），步数是 build 后派生量。
     const r = this.cfg.run || (this.cfg.run = {});
-    body.appendChild(this._row("GPU（可选）", this._gpuControl()));
     body.appendChild(this._row("超时 (s)",
       this._input("run.timeout_s", r.timeout_s ?? 3600, "num")));
     // 提交面板挂载点（app.js 常驻 DOM 移进来; 2026-08-31au 方案A：

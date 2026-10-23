@@ -278,7 +278,8 @@ def _backend() -> str:
 
 # 白名单：会话只代拨这几族。别的路径一律 403（不做通用代理）。
 # （api/health：Client.health() 经 /gw 走会话轨时需要。）
-_GW_ALLOW = ("whoami", "api/auth/", "api/tools/", "api/jobs", "api/health")
+_GW_ALLOW = ("whoami", "api/auth/", "api/tools/", "api/jobs", "api/health",
+             "api/config/")
 
 
 # ── 会话代持凭据（G72 终稿：token 只住会话，脚本零凭据）────────────
