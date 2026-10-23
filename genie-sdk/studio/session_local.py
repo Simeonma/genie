@@ -7,7 +7,7 @@
   因为不存在任何需要跨的边界（同机、同用户、同信任域、同生命周期）。
 - **跨进程**（云宿主 / `genie console` / 外部工具）：
   `session_client.SessionClient` 走 `/session/*`（挂在 Studio 上的同一套
-  路由，带本机口令）或独立会话服务的 `:8123`。
+  路由，带本机口令）——**独立会话服务已退役**（G63：会话与 GUI 同进程）。
 
 两个适配器实现同一张方法表，所以门面（`register_session_routes` /
 `register_result_routes` / `gateway`）对"会话在哪"完全无知。

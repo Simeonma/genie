@@ -572,7 +572,7 @@ def req_key(request: Request) -> str:
     return (request.headers.get("X-API-Key") or "").strip()
 
 
-# 传统入口（``python -m genie.studio`` / uvicorn 字符串引用）：会话地址从
+# 传统工厂用法（uvicorn 字符串引用）：会话地址从
 # env 取。**推荐入口是 ``genie studio``**——它自己起会话并把地址显式注入
 # （O1），不依赖环境变量。
 app = create_app(mount_session=True,
