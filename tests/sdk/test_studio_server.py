@@ -7,9 +7,7 @@ import pathlib
 
 from fastapi.testclient import TestClient
 
-from genie.studio.server import app
 
-client = TestClient(app)
 
 
 class FakeSession:
@@ -76,6 +74,14 @@ class FakeSession:
     def gateway(self, method, path, **kw):
         self._rec("gateway", method=method, path=path, **kw)
         return self.gateway_reply
+
+
+# 旧形态靠 `genie.studio.server:app` 的模块级实例（它的会话地址默认指向
+# 已退役的 :8123）。现在必须先有会话：这里注入 FakeSession，与本地
+# `genie studio` 显式注入 LocalSessionHost 同构。
+from genie.studio.server import create_app  # noqa: E402
+
+client = TestClient(create_app(mount_session=True, session=FakeSession()))
 
 
 def _app(**kw):

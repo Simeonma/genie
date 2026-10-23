@@ -72,9 +72,16 @@ def resolve_owner() -> str:
 
 
 def session_url() -> str:
-    """SessionClient 构造的兜省地址（硬编码 :8123——旧形态遗留，无人经 env
-    配置；现行所有调用方要么显式注入地址，要么经门牌 discover）。"""
-    return "http://127.0.0.1:8123"
+    """**没有默认会话地址**——独立会话服务（旧 :8123）已随 G63 退役。
+
+    这个函数故意改成"响亮失败"：以前它硬编码 `127.0.0.1:8123`，而那个端口
+    早就没人听，于是所有忘了注入地址的调用方都会静默去拨一个空端口（宿主
+    `/api/exec` 因此 503 了很久才被发现）。现在缺地址就当场报错，指路 =
+    门牌 `~/.genie/studio.json`（`SessionClient.discover()`）或显式 `base_url`。
+    """
+    raise RuntimeError(
+        "没有会话地址：用 SessionClient.discover() 读门牌，或显式传 base_url"
+        "（独立会话服务已退役，不再有 127.0.0.1:8123 这个默认值）")
 
 
 class SessionClient:
@@ -253,13 +260,6 @@ class SessionClient:
             headers={"X-Upstream-Key": key,
                      "X-Upstream-Timeout": str(int(timeout))},
             timeout=max(timeout, self.timeout) + 5.0)
-
-
-def session_req(method: str, path: str, json_body: dict | None = None,
-                params: dict | None = None) -> dict:
-    """兼容壳（云宿主仍按此签名调用）：等价 SessionClient()._json。"""
-    return SessionClient()._json(method, path, json_body=json_body,
-                                 params=params)
 
 
 # ---------------------------------------------------------------------------

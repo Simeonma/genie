@@ -116,7 +116,14 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
     from .session_client import resolve_owner
     owner_of = owner_fn or (lambda request: resolve_owner())
     key_of = key_fn or (lambda request: req_key(request))
-    sess = session or SessionClient()
+    if session is not None:
+        sess = session
+    elif mount_session:
+        raise ValueError(
+            "create_app(mount_session=True) 需要显式 session：地址来自门牌"
+            " discover() 或 LocalSessionHost（独立会话服务已退役，没有默认地址）")
+    else:
+        sess = None
 
     app = FastAPI(title=title, version=genie.__version__)
 
@@ -154,6 +161,9 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
                      "auth_required": bool(require_auth),
                      "upstream": health_upstream,
                      "session": False}
+        if sess is None:          # 纯静态/宿主角色的 app：没有会话门可报
+            out["session"] = None
+            return out
         try:
             h = sess.health()
             out["session"] = bool(h.get("ok"))
@@ -570,10 +580,3 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
 def req_key(request: Request) -> str:
     """本请求的 GUI 凭据（X-API-Key 头，登录框产物）。"""
     return (request.headers.get("X-API-Key") or "").strip()
-
-
-# 传统工厂用法（uvicorn 字符串引用）：会话地址从
-# env 取。**推荐入口是 ``genie studio``**——它自己起会话并把地址显式注入
-# （O1），不依赖环境变量。
-app = create_app(mount_session=True,
-                 require_auth=(os.environ.get("GENIE_STUDIO_OPEN") != "1"))
