@@ -1,19 +1,21 @@
-"""genie.models — SimConfig 线格式的唯一真源（懒加载壳）。
+"""genie_protocol — SimConfig 线格式的唯一真源（独立分发包，懒加载壳）。
 
-v0.8 架构定案（framework.md §三）：pydantic v2、零内核依赖，SDK 与
-内核 import 同一份模型——不存在同步问题，锁测试退役。三件套：
+2026-10-27 拆分自 SDK 仓 ``genie/models/``（逐字节迁移）：pydantic v2、
+零内核依赖、零 SDK 依赖——SDK 客户端 / 网关 / 内核三方 import 同一份
+模型。SDK 侧 ``genie.models`` 是本包的兼容薄壳。三件套：
 
 - ``_wire.py``   全部 Spec 模型 + SimConfig + 线格式常量（pydantic）
 - ``expr.py``    安全线表达式求值器（纯 Python：ast + math + re，零 pydantic）
 - ``resolve.py`` 参数解析（dict 伴走 + 表达式槽求值 + 求值结果校验）
 
-懒加载纪律（2026-10 站长定案：浏览器镜像零新增依赖）——``import
-genie.models.expr`` **不得拉起 pydantic**：本 ``__init__`` 只做名字表 +
-``__getattr__``（PEP 562），模型本体在属性首次触达时才从 ``_wire``
-加载。原生侧 ``from genie.models import SimConfig`` 手感不变；星号导入
-按 ``__all__`` 触发完整加载。
+懒加载纪律（2026-10 站长定案）——``import genie_protocol.expr`` **不得
+拉起 pydantic**：本 ``__init__`` 只做名字表 + ``__getattr__``（PEP 562），
+模型本体在属性首次触达时才从 ``_wire`` 加载；星号导入按 ``__all__``
+触发完整加载。
 """
 from __future__ import annotations
+
+__version__ = "2.0.0a1"   # 与 protocol/pyproject.toml 双处对齐（RELEASE 纪律）
 
 __all__ = [
     # 基础类型别名
