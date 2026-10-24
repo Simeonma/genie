@@ -243,7 +243,7 @@ def step6_release(whl: Path, ver: str) -> None:
     out = _run(cmd, check=False)
     if out.returncode != 0:
         _p(out.stdout.strip())
-        _p(out.stderr.strip(), file=sys.stderr)
+        print(out.stderr.strip(), file=sys.stderr)
         _fail("Release 创建失败（若是 gh 未登录：gh auth login -h github.com --web）")
     _p("   " + out.stdout.strip())
 
