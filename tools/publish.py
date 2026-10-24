@@ -237,28 +237,29 @@ def step6_release(whls: list[Path], ver: str) -> None:
                   check=False).returncode == 0
     if exists:
         _p(f"   {tag} 已存在，跳过创建（附件仍会补传/覆盖）")
-    body = (
-        f"genie SDK {ver}。\n\n"
-        "```bash\n"
-        "# GitHub 直连（若 raw.githubusercontent.com 可达）\n"
-        f"pip install https://github.com/{slug}/raw/dist/dist/{sdk.name}\n"
-        "# CDN 镜像（国内网络推荐：raw.githubusercontent 常不可达）\n"
-        f"pip install https://cdn.jsdelivr.net/gh/{slug}@dist/dist/{sdk.name}\n"
-        "```\n\n"
-        + (f"协议层 `{proto.name}` 同在 `dist` 分支与本 Release 附件"
-           "（内核/网关侧只需装它）。\n\n" if proto else "")
-        + f"源码：本仓 main。wheel 亦在 `dist` 分支。"
-    )
-    cmd = ["gh", "release", "create", tag, "--repo", slug,
-           "--title", f"genie SDK {ver}", "--notes", body]
-    if "a" in ver:
-        cmd.append("--prerelease")
-    out = _run(cmd, check=False)
-    if out.returncode != 0:
-        _p(out.stdout.strip())
-        print(out.stderr.strip(), file=sys.stderr)
-        _fail("Release 创建失败（若是 gh 未登录：gh auth login -h github.com --web）")
-    _p("   " + out.stdout.strip())
+    else:
+        body = (
+            f"genie SDK {ver}。\n\n"
+            "```bash\n"
+            "# GitHub 直连（若 raw.githubusercontent.com 可达）\n"
+            f"pip install https://github.com/{slug}/raw/dist/dist/{sdk.name}\n"
+            "# CDN 镜像（国内网络推荐：raw.githubusercontent 常不可达）\n"
+            f"pip install https://cdn.jsdelivr.net/gh/{slug}@dist/dist/{sdk.name}\n"
+            "```\n\n"
+            + (f"协议层 `{proto.name}` 同在 `dist` 分支与本 Release 附件"
+               "（内核/网关侧只需装它）。\n\n" if proto else "")
+            + f"源码：本仓 main。wheel 亦在 `dist` 分支。"
+        )
+        cmd = ["gh", "release", "create", tag, "--repo", slug,
+               "--title", f"genie SDK {ver}", "--notes", body]
+        if "a" in ver:
+            cmd.append("--prerelease")
+        out = _run(cmd, check=False)
+        if out.returncode != 0:
+            _p(out.stdout.strip())
+            print(out.stderr.strip(), file=sys.stderr)
+            _fail("Release 创建失败（若是 gh 未登录：gh auth login -h github.com --web）")
+        _p("   " + out.stdout.strip())
     # 附件双轮子（2026-10-27 起）：已存在则 --clobber 覆盖补传
     up = _run(["gh", "release", "upload", tag, "--repo", slug, "--clobber",
                *[str(w) for w in whls]], check=False)
