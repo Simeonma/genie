@@ -125,7 +125,7 @@ def step2_build() -> list[Path]:
             shutil.rmtree(p)
     for p in ROOT.glob("*.egg-info"):
         shutil.rmtree(p, ignore_errors=True)
-    for target in (".", "protocol"):
+    for target in (".", "./protocol"):   # "./" 前缀必须：裸 "protocol" 会被 pip 当 PyPI 包名（踩过）
         r = _run([sys.executable, "-m", "pip", "wheel", target, "-w", str(WHL_DIR),
                   "--no-deps", "--no-build-isolation", "-q"], check=False)
         if r.returncode != 0:
