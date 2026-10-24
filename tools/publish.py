@@ -115,25 +115,31 @@ def step1_version(ver: str) -> None:
     _p(f"   ok（ pyproject.toml / genie-sdk/__init__.py 均为 {ver} ）")
 
 
-# ── ② 构建 wheel ──────────────────────────────────────────────────────────
-def step2_build() -> Path:
-    _p("── ② 构建 wheel")
+# ── ② 构建 wheel（SDK + protocol 双产物，2026-10-27 起）───────────────────
+def step2_build() -> list[Path]:
+    _p("── ② 构建 wheel（SDK + protocol）")
     for p in (ROOT / "build", WHL_DIR):
         if p.exists():
             shutil.rmtree(p)
     for p in ROOT.glob("*.egg-info"):
         shutil.rmtree(p, ignore_errors=True)
-    r = _run([sys.executable, "-m", "pip", "wheel", ".", "-w", str(WHL_DIR),
-              "--no-deps", "--no-build-isolation", "-q"], check=False)
-    if r.returncode != 0:
-        _p(r.stdout.strip())
-        _p(r.stderr.strip(), file=sys.stderr)
-        _fail("wheel 构建失败（若缺 setuptools：python -m pip install setuptools）")
+    for target in (".", "protocol"):
+        r = _run([sys.executable, "-m", "pip", "wheel", target, "-w", str(WHL_DIR),
+                  "--no-deps", "--no-build-isolation", "-q"], check=False)
+        if r.returncode != 0:
+            _p(r.stdout.strip())
+            print(r.stderr.strip(), file=sys.stderr)
+            _fail(f"wheel 构建失败（{target}；若缺 setuptools：python -m pip install setuptools）")
     whls = sorted(WHL_DIR.glob("*.whl"))
-    if len(whls) != 1:
-        _fail(f"dist/ 里应当恰好一个 wheel，实际 {len(whls)} 个")
-    _p(f"   {whls[0].name}  ({whls[0].stat().st_size / 1024 / 1024:.2f} MB)")
-    return whls[0]
+    names = [w.name for w in whls]
+    ok = (len(whls) == 2
+          and any(n.startswith("genie_sdk-") for n in names)
+          and any(n.startswith("genie_protocol-") for n in names))
+    if not ok:
+        _fail(f"dist/ 里应当恰好两个 wheel（genie_sdk + genie_protocol），实际 {names}")
+    for w in whls:
+        _p(f"   {w.name}  ({w.stat().st_size / 1024 / 1024:.2f} MB)")
+    return whls
 
 
 # ── ③ 发布门（产物级）─────────────────────────────────────────────────────
@@ -198,16 +204,18 @@ def step4_push_main(ver: str) -> None:
     _p("   已推送 main")
 
 
-# ── ⑤ dist 孤儿分支（纯管道，不碰工作树）───────────────────────────────────
-def step5_dist(whl: Path, ver: str) -> None:
+# ── ⑤ dist 孤儿分支（纯管道，不碰工作树；双轮子，2026-10-27 起）──────────
+def step5_dist(whls: list[Path], ver: str) -> None:
     _p("── ⑤ 重建 dist 孤儿分支")
     # git mktree 不接受带斜杠的路径：先造 dist 子树，再套根树。
-    blob = _git("hash-object", "-w", str(whl)).strip()
-    sub = _git("mktree", stdin=f"100644 blob {blob}\t{whl.name}\n").strip()
+    entries = "".join(
+        f"100644 blob {_git('hash-object', '-w', str(w)).strip()}\t{w.name}\n"
+        for w in whls)
+    sub = _git("mktree", stdin=entries).strip()
     tree = _git("mktree", stdin=f"040000 tree {sub}\tdist\n").strip()
     commit = _git("commit-tree", tree, "-m", f"wheel: genie {ver}").strip()
     _git("push", "-q", "--force", "origin", f"{commit}:refs/heads/dist")
-    _p(f"   dist 分支 → {commit[:7]}（仅含 dist/{whl.name}）")
+    _p(f"   dist 分支 → {commit[:7]}（{len(whls)} 个 wheel）")
 
 
 # ── ⑥ GitHub Release ──────────────────────────────────────────────────────
@@ -217,15 +225,14 @@ def _repo_slug() -> str:
     return m.group("slug") if m else "Simeonma/genie-sdk"
 
 
-def step6_release(whl: Path, ver: str) -> None:
+def step6_release(whls: list[Path], ver: str) -> None:
     _p("── ⑥ GitHub Release")
     slug = _repo_slug()
     tag = f"v{ver}"
     exists = _run(["gh", "release", "view", tag, "--repo", slug],
                   check=False).returncode == 0
     if exists:
-        _p(f"   {tag} 已存在，跳过（要重发先删：gh release delete {tag} --cleanup-tag）")
-        return
+        _p(f"   {tag} 已存在，跳过创建（附件仍会补传/覆盖）")
     body = (
         f"genie SDK {ver}。\n\n"
         "```bash\n"
@@ -246,6 +253,14 @@ def step6_release(whl: Path, ver: str) -> None:
         print(out.stderr.strip(), file=sys.stderr)
         _fail("Release 创建失败（若是 gh 未登录：gh auth login -h github.com --web）")
     _p("   " + out.stdout.strip())
+    # 附件双轮子（2026-10-27 起）：已存在则 --clobber 覆盖补传
+    up = _run(["gh", "release", "upload", tag, "--repo", slug, "--clobber",
+               *[str(w) for w in whls]], check=False)
+    if up.returncode != 0:
+        _p(up.stdout.strip())
+        print(up.stderr.strip(), file=sys.stderr)
+        _fail("Release 附件上传失败")
+    _p("   附件：" + "、".join(w.name for w in whls))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -261,14 +276,15 @@ def main(argv: list[str] | None = None) -> int:
     _p(f"发版 {ver}   仓：{ROOT}")
     step0_worktree()
     step1_version(ver)
-    whl = step2_build()
-    step3_gate(whl)
+    whls = step2_build()
+    sdk_whl = next(w for w in whls if w.name.startswith("genie_sdk-"))
+    step3_gate(sdk_whl)
     if args.dry_run:
         _p("\n--dry-run：止于发布门，未提交、未推送、未建 Release。")
         return 0
     step4_push_main(ver)
-    step5_dist(whl, ver)
-    step6_release(whl, ver)
+    step5_dist(whls, ver)
+    step6_release(whls, ver)
     _p(f"\n── 完成：{ver}（源码 main / wheel dist / Release v{ver}）")
     return 0
 
