@@ -48,8 +48,7 @@ packages = ["genie", "genie.models", "genie.core", "genie.core.nkdata",
             "genie.core.script", "genie.lib", "genie.net",
             "genie.integrations", "genie.studio",
             "genie_protocol"]
-package-dir = { genie = "genie-sdk",
-                genie_protocol = "protocol/genie_protocol" }
+package-dir = { genie = "genie-sdk", genie_protocol = "protocol/genie_protocol" }
 
 # 随包数据：n-k 材料库 yml + 内容面（手册 / 示例）+ Studio 前端壳。
 # 2026-10-18 修复：原规则全是**单层 glob**（static/*），漏掉
