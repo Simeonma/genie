@@ -231,6 +231,8 @@ def step6_release(whls: list[Path], ver: str) -> None:
     _p("── ⑥ GitHub Release")
     slug = _repo_slug()
     tag = f"v{ver}"
+    sdk = next(w for w in whls if w.name.startswith("genie_sdk-"))
+    proto = next((w for w in whls if w.name.startswith("genie_protocol-")), None)
     exists = _run(["gh", "release", "view", tag, "--repo", slug],
                   check=False).returncode == 0
     if exists:
@@ -239,11 +241,13 @@ def step6_release(whls: list[Path], ver: str) -> None:
         f"genie SDK {ver}。\n\n"
         "```bash\n"
         "# GitHub 直连（若 raw.githubusercontent.com 可达）\n"
-        f"pip install https://github.com/{slug}/raw/dist/dist/{whl.name}\n"
+        f"pip install https://github.com/{slug}/raw/dist/dist/{sdk.name}\n"
         "# CDN 镜像（国内网络推荐：raw.githubusercontent 常不可达）\n"
-        f"pip install https://cdn.jsdelivr.net/gh/{slug}@dist/dist/{whl.name}\n"
+        f"pip install https://cdn.jsdelivr.net/gh/{slug}@dist/dist/{sdk.name}\n"
         "```\n\n"
-        f"源码：本仓 main。wheel 亦在 `dist` 分支。"
+        + (f"协议层 `{proto.name}` 同在 `dist` 分支与本 Release 附件"
+           "（内核/网关侧只需装它）。\n\n" if proto else "")
+        + f"源码：本仓 main。wheel 亦在 `dist` 分支。"
     )
     cmd = ["gh", "release", "create", tag, "--repo", slug,
            "--title", f"genie SDK {ver}", "--notes", body]
