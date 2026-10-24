@@ -4,15 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genie-sdk"
-version = "2.0.0a9"
+version = "2.0.0a10"
 description = "GENIE SDK v2 — 脚本构建仿真、f.run() 提交云端 GPU；preview_script 零网络预览（模型与提交互不相干）"
 requires-python = ">=3.10"
 dependencies = [
     "requests>=2.28",
     "numpy>=1.24",
-    # 协议层（2026-10-27 拆分）：genie.models = genie_protocol 的兼容壳，
-    # 线格式真源住本仓 protocol/ 子目录（同一公开仓，subdirectory 安装）
-    "genie-protocol @ git+https://github.com/Simeonma/genie-sdk.git@v2.0.0a1#subdirectory=protocol",
+    # 协议层（2026-10-27 拆分）：genie.models = genie_protocol 的兼容壳。
+    # 普通版本约束而非 git 直链——直链会强迫 pip clone GitHub（实测：给
+    # CDN 轮子也拦不住），国内用户没法活；约束式让"双轮子 CDN 安装"
+    # 完全自洽，也为将来上 PyPI 铺路。源码安装者需先装 protocol 轮子。
+    "genie-protocol>=2.0.0a1,<3",
     # _cfg 即 SimConfig 实例——pydantic 仍是 import genie 的硬运行依赖
     "pydantic>=2,<3",
     # 结果读取（genie-results-h5/1：f.results(job_id) 的 SimData 结构体）
