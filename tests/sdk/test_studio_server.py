@@ -463,15 +463,27 @@ def test_gateway_passes_error_status_through():
     assert r.json()["detail"] == "用户名或邮箱已存在"
 
 
-def test_gateway_forwards_tools_and_jobs():
-    """工具面（库清单/材料拟合）与作业面（状态/取消）同一条转发路。"""
+def test_tools_are_local_and_jobs_forward():
+    """2026-10-27 G19b 翻转：工具面（库清单/材料拟合）改**本地实现**
+    （genie.core.material；网关 tools 面撤除，不再产生网关转发）；
+    作业面仍走同一条转发路。"""
     c, fake = _app()
-    c.get("/api/tools/nk_library", params={"name": "Au"})
-    kw = fake.of("gateway")[-1]
-    assert kw["path"] == "api/tools/nk_library" and kw["method"] == "GET"
-    c.post("/api/tools/material_fit", json={"library": "au"})
-    kw = fake.of("gateway")[-1]
-    assert kw["path"] == "api/tools/material_fit" and kw["method"] == "POST"
+    # 本地库清单：真实随包 yml，含 Au
+    r = c.get("/api/tools/nk_library")
+    assert r.status_code == 200
+    assert "Au" in r.json()["models"]
+    # 本地按名取数：三列等长、波长在米量级
+    r = c.get("/api/tools/nk_library", params={"name": "Au"})
+    body = r.json()
+    assert body["name"] == "Au"
+    assert len(body["wavelength_m"]) == len(body["n"]) == len(body["k"])
+    assert 1e-8 < body["wavelength_m"][0] < 1e-5
+    # 拟合同样本地（scipy 懒加载；拿库数据拟合 Au）
+    r = c.post("/api/tools/material_fit", json={"library": "Au"})
+    assert r.status_code == 200
+    assert "material_node" in r.json()
+    # 工具面零网关转发；作业面照旧
+    assert not [k for k in fake.of("gateway") if "tools" in k["path"]]
     c.post("/api/jobs/J1/cancel", headers={"X-API-Key": "gt_t"})
     kw = fake.of("gateway")[-1]
     assert kw["path"] == "api/jobs/J1/cancel" and kw["method"] == "POST"

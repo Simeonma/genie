@@ -15,6 +15,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PKG_DIR = ROOT / "genie-sdk"
+PROTOCOL_DIR = ROOT / "protocol"  # genie_protocol 独立分发包（2026-10-27 拆分，源码随本仓）
 
 _EDITABLE_PREFIX = "__editable___genie_"  # 同时命中旧名 genie 与新名 genie-sdk 的 editable 安装
 
@@ -46,6 +47,10 @@ def bind_local_genie() -> None:
         del sys.modules[name]
     if not any(f is _LocalGenieFinder for f in sys.meta_path):
         sys.meta_path.insert(0, _LocalGenieFinder)
+    # genie_protocol（协议层）：genie.models 壳 import 它，路径随 genie 一并钉住本仓
+    _p = str(PROTOCOL_DIR)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 
 def assert_bound_to_this_tree() -> None:

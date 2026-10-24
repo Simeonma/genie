@@ -7,7 +7,7 @@
 
 | 层 | 允许依赖 | 禁止 |
 |---|---|---|
-| models | stdlib / pydantic | 任何 genie 兄弟层、fdtd |
+| models | stdlib / pydantic / genie_protocol（2026-10-27 起为兼容壳，真源=protocol/genie_protocol，独立分发包） | 任何 genie 兄弟层、fdtd |
 | core | models / stdlib / numpy（交互与传输能力经组合根 hooks 注入，见 genie/__init__「组合根」） | net / integrations / studio / host / services / fdtd |
 | net / integrations | core / models（向下） | studio / host / services / fdtd |
 | studio | 整个 genie 包（它是组合层） | host / services / fdtd |
@@ -117,8 +117,8 @@ def test_layering_contract(path: Path):
             pytest.fail(
                 f"{mod}: 反向依赖禁令——genie 不得 import {target}（服务层"
                 f"在 genie-service 仓；两边只经 HTTP 说话）")
-        if not target.startswith("genie"):
-            continue                            # 外部依赖不在分层契约内
+        if not (target == "genie" or target.startswith("genie.")):
+            continue                            # 外部依赖（含基础包 genie_protocol）不在分层契约内
         # 组合根 `genie`（包 __init__）不是"无层"，是**最上层**：只有 studio
         # 这个组合层可以直接用它；其余层要用上层能力一律走 hooks 注入
         # （2026-10-21：core/preview 曾 `import genie` 换 connect，被旧判据
@@ -138,6 +138,29 @@ def test_layering_contract(path: Path):
                 f"{mod}: 分层契约违规——{_ALLOWED and own} 层不得依赖 "
                 f"{layer} 层（{own} 允许: {sorted(allowed) or '仅外部依赖'}；"
                 f"交互/传输能力走组合根 hooks，见 genie/__init__）")
+
+
+def test_protocol_layer_is_leaf():
+    """genie_protocol（protocol/ 子目录，独立分发包 genie-protocol）= 纯叶子：
+    零 genie 依赖、零 fdtd/cloud——内核与网关只装它一个也能用（2026-10-27
+    拆分定案的新契约面；本守卫防它悄悄长回对 SDK 的依赖）。"""
+    PROTO = SDK.parent / "protocol" / "genie_protocol"
+    offenders = []
+    for p in sorted(PROTO.rglob("*.py")):
+        if "__pycache__" in p.parts:
+            continue
+        tree = ast.parse(p.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for a in node.names:
+                    offenders.append((p.name, node.lineno, a.name))
+            elif isinstance(node, ast.ImportFrom):
+                if node.level == 0 and node.module:
+                    offenders.append((p.name, node.lineno, node.module))
+    bad = [f"{f}:{ln} -> {t}" for f, ln, t in offenders
+           if t.split(".")[0] in ("genie", "fdtd", "cloud", "host", "services")]
+    assert not bad, ("genie_protocol 必须零 genie/fdtd/cloud 依赖（它是三方"
+                     "共享的协议叶子）：\n" + "\n".join(bad))
 
 
 def test_low_layers_use_relative_imports():
@@ -170,5 +193,5 @@ def test_composition_root_wires_core():
 
     for key in ("expert_factory",):
         assert key in simulate.hooks, f"组合根漏接 simulate.hooks[{key!r}]"
-    assert "remote_nk_fetch" in material.hooks, \
-        "组合根漏接 material.hooks['remote_nk_fetch']"
+    # 2026-10-27 G19b 翻转：material 的 remote_nk_fetch hook 已随材质库
+    # 本地化退役（material.hooks 面删除）——此处不再断言。

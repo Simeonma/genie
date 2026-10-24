@@ -1,19 +1,43 @@
-"""genie.models — SimConfig 线格式的唯一真源（懒加载壳）。
+"""genie.models — 兼容薄壳 → 独立分发包 ``genie-protocol``（import 名 ``genie_protocol``）。
 
-v0.8 架构定案（framework.md §三）：pydantic v2、零内核依赖，SDK 与
-内核 import 同一份模型——不存在同步问题，锁测试退役。三件套：
-
-- ``_wire.py``   全部 Spec 模型 + SimConfig + 线格式常量（pydantic）
-- ``expr.py``    安全线表达式求值器（纯 Python：ast + math + re，零 pydantic）
-- ``resolve.py`` 参数解析（dict 伴走 + 表达式槽求值 + 求值结果校验）
-
-懒加载纪律（2026-10 站长定案：浏览器镜像零新增依赖）——``import
-genie.models.expr`` **不得拉起 pydantic**：本 ``__init__`` 只做名字表 +
-``__getattr__``（PEP 562），模型本体在属性首次触达时才从 ``_wire``
-加载。原生侧 ``from genie.models import SimConfig`` 手感不变；星号导入
-按 ``__all__`` 触发完整加载。
+2026-10-27 拆分（挂账⑦手术）：线格式唯一真源 = 本仓 ``protocol/genie_protocol/``
+（独立 wheel ``genie-protocol``，公开）；内核与网关直接依赖 ``genie_protocol``，
+SDK 侧保留 ``genie.models.*`` 公开面不变。懒加载纪律原样保留——
+``import genie.models.expr`` 仍不得拉起 pydantic（本壳自身零重物 import）。
 """
 from __future__ import annotations
+
+
+def _ensure_genie_protocol() -> None:
+    """源码树形态下自举 ``genie_protocol``（本仓 ``protocol/`` 子目录）。
+
+    装了 ``genie-protocol``（wheel/依赖声明）的环境 ``import`` 一次即中；
+    只有"直接从源码树跑、又没走 ``_tree`` 绑定"的进程（典型 =
+    ``kernel_worker`` 子进程，见 kernel_session ``_respawn``）才落到文件位
+    自举——按 ``models/`` 的相对位置找 ``protocol/genie_protocol``。
+    """
+    try:
+        import genie_protocol  # noqa: F401
+        return
+    except ImportError:
+        pass
+    import importlib.util
+    import sys
+    from pathlib import Path
+    pkg = Path(__file__).resolve().parents[2] / "protocol" / "genie_protocol"
+    if not (pkg / "__init__.py").is_file():
+        raise ImportError(
+            "genie-protocol 未安装，且源码树里找不到 protocol/genie_protocol"
+            "（pip install genie-protocol，或从本仓 protocol/ 子目录安装）")
+    spec = importlib.util.spec_from_file_location(
+        "genie_protocol", pkg / "__init__.py",
+        submodule_search_locations=[str(pkg)])
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["genie_protocol"] = mod
+    spec.loader.exec_module(mod)
+
+
+_ensure_genie_protocol()
 
 __all__ = [
     # 基础类型别名
@@ -50,8 +74,8 @@ _INTERNAL = frozenset({
 
 def __getattr__(name: str):
     if name in __all__ or name in _INTERNAL:
-        from . import _wire
-        return getattr(_wire, name)
+        import genie_protocol
+        return getattr(genie_protocol, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 

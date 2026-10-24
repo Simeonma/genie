@@ -24,7 +24,7 @@ into one list.
 """
 from __future__ import annotations
 
-import os
+import os   # 2026-10-27 G19b 翻转后已无 os 使用——保留待下轮清理
 from dataclasses import dataclass
 
 import numpy as np
@@ -39,16 +39,9 @@ from ..models import LIBRARY_FIT_DEFAULTS   # 拟合默认值正典（G2 归一�
 __all__ = ["fit_nk", "load_library_nk", "list_library_materials"]
 
 # ── 组合根注入点（G1 分层契约，2026-10-11 定案）──────────────────────
-# core 只依赖 models/本地数据：load_library_nk 的 HTTP 回退实现在上层
-# （net.client.fetch_nk_payload），由 ``genie/__init__`` 组合根在
-# import 时注入。缺省 = 报"回退未接线"（产品面不可达——import genie
-# 即接线）。分层守卫 = tests/sdk/test_layering.py。
-hooks: dict = {}
-
-
-def _wire(**impl) -> None:
-    """组合根注册通道（genie/__init__ 专用；幂等覆盖）。"""
-    hooks.update(impl)
+# 2026-10-27 G19b 翻转：材质库 HTTP 回退（remote_nk_fetch hook）随协议层
+# 手术退役——n-k 库随包分发，load_library_nk 纯本地（未命中即报错）。
+# simulate.expert_factory 的 hook 注入仍在组合根；本模块已无 hook 面。
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -505,37 +498,30 @@ def fit_nk(nk, fit_range=LIBRARY_FIT_DEFAULTS["fit_range"],
     }
 
 
-def load_library_nk(name, base_url=None, api_key=None, username=None,
-                    *, timeout=30.0, allow_remote=True):
+def load_library_nk(name):
     """取材质库某名的原始 n-k 数据 → (wl_m, n, k)。
 
-    F1 起 n-k 库随 fit 能力迁入服务仓：SDK 包内自带全部 yml
-    （``genie/nkdata/``，迁移时与内核库逐字节一致），本函数**优先读
-    本地打包数据**（离线可用，浏览器除外——Pyodide 无本地文件，继续
-    走 HTTP）；本地无该库名时才回退 HTTP 端点
-    ``GET /api/tools/nk_library?name=<name>``（后端读的也是同一份
-    随迁库，本地/云端同构）。永不 import fdtd。
+    2026-10-27 起**纯本地**（G19b 翻转：材质库回归 SDK，网关 tools 面
+    随协议层手术撤除，HTTP 回退与 allow_remote/base_url 等参数一并
+    退役）：n-k 库随包分发（``genie/nkdata/``，与内核库逐字节一致），
+    本地未命中直接报错并列出查询入口。永不 import fdtd。
 
     Parameters
     ----------
     name : str
-        库名（如 ``'Au'``）。base_url / api_key / username 缺省读环境
-        变量 ``GENIE_URL`` / ``GENIE_API_KEY`` / ``GENIE_USERNAME``。
-    allow_remote : bool
-        本地无该库名时是否允许 HTTP 回退（默认 True；False 则本地
-        未命中直接报错——纯离线断言用）。
+        库名（如 ``'Au'``）。
 
     Returns
     -------
     (wl_m, n, k) : tuple[np.ndarray, np.ndarray, np.ndarray]
         波长（米）、折射率实部 n、消光系数 k（与 ``fit_nk`` 的 3-tuple
-        输入约定一致；本地路径波长 µm→m 已换算）。
+        输入约定一致；波长 µm→m 已换算）。
 
     Raises
     ------
     ValueError
-        库名为空/含路径分隔符；本地未命中且（缺 base_url 或
-        allow_remote=False）；后端返回意外格式；或三列不等长/非法。
+        库名为空，或本地未命中（可用 genie.material.list_library_materials()
+        查全部本地库名）。
     """
     from .nkdata import load_nk_data
 
@@ -544,47 +530,14 @@ def load_library_nk(name, base_url=None, api_key=None, username=None,
             "load_library_nk(name) requires a non-empty string library "
             "name")
     data = load_nk_data(name)
-    if data is not None:
-        wl_um, n, k = data
-        return (np.asarray(wl_um, dtype=float) * 1e-6,
-                np.asarray(n, dtype=float), np.asarray(k, dtype=float))
-    if not allow_remote:
+    if data is None:
         raise ValueError(
-            f"library {name!r} not found in the local n-k library "
-            f"(offline mode: no HTTP fallback; "
+            f"library {name!r} not found in the local n-k library — "
             f"genie.material.list_library_materials() lists all local "
-            f"library names)")
-    url = base_url or os.environ.get("GENIE_URL")   # 可能为 None——组合根
-    # 的 hook（G72 会话代持）还会沿 凭据仓>缺省 链补；这里不预拦。
-    fetch = hooks.get("remote_nk_fetch")
-    if fetch is None:
-        if not url:
-            raise ValueError(
-                "load_library_nk requires base_url (or set the GENIE_URL "
-                "environment variable) — cannot reach the material "
-                "library; call genie.connect(...) first")
-        raise RuntimeError(
-            "material library HTTP fallback is not wired — the "
-            "composition root (genie/__init__) injects it; a normal "
-            "`import genie` completes the wiring")
-    key = api_key if api_key is not None else os.environ.get("GENIE_API_KEY")
-    user = username if username is not None else os.environ.get("GENIE_USERNAME")
-    payload = fetch(name, url, key, user, timeout)
-    if (not isinstance(payload, dict) or "wavelength_m" not in payload
-            or "n" not in payload or "k" not in payload):
-        raise ValueError(
-            f"material library endpoint returned an unexpected format "
-            f"for {name!r}: {str(payload)[:200]!r} — verify the backend "
-            f"/api/tools/nk_library supports ?name= returning three "
-            f"columns")
-    wl = np.asarray(payload["wavelength_m"], dtype=float)
-    n = np.asarray(payload["n"], dtype=float)
-    k = np.asarray(payload["k"], dtype=float)
-    if not (len(wl) == len(n) == len(k)):
-        raise ValueError(
-            f"material library {name!r} columns have unequal lengths: "
-            f"wavelength_m={len(wl)}, n={len(n)}, k={len(k)}")
-    return (wl, n, k)
+            f"library names")
+    wl_um, n, k = data
+    return (np.asarray(wl_um, dtype=float) * 1e-6,
+            np.asarray(n, dtype=float), np.asarray(k, dtype=float))
 
 
 def list_library_materials():

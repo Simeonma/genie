@@ -56,7 +56,7 @@ from .integrations.agent_tools import check_script
 # sys.modules 后属性寻址与语句级 import 皆通（material 实体在 core/）。
 _sys.modules[__name__ + ".material"] = material
 
-__version__ = "2.0.0a8"
+__version__ = "2.0.0a9"
 
 
 def _swap_connect(fn):
@@ -78,29 +78,19 @@ def _swap_connect(fn):
 
 
 # ── 组合根（G1 分层契约，2026-10-11 定案）───────────────────────────
-# core 只依赖 models；expert / 材质库 HTTP 回退的实现在上层
-# （net / integrations），在此一次性注入 core 的 hooks——``import genie``
-# 即接线，core 永不反向 import 上层。分层守卫 = tests/sdk/test_layering.py。
+# core 只依赖 models；expert 的实现在上层（integrations），在此一次性
+# 注入 core 的 hooks——``import genie`` 即接线，core 永不反向 import 上层。
+# （2026-10-27 G19b 翻转：材质库 HTTP 回退 hook 已退役，材质库纯本地。）
+# 分层守卫 = tests/sdk/test_layering.py。
 def _wire_core_hooks() -> None:
-    from .core import material as _material, preview as _preview
-    from .core import simulate as _simulate
-    from .net import client as _client
+    from .core import preview as _preview, simulate as _simulate
     from .net.expert import ExpertSession
 
     _simulate._wire(
         expert_factory=lambda client: ExpertSession(client),
     )
-    def _nk_fetch_via_store(name, url, key, user, timeout):
-        """材质库 HTTP 回退的凭据仓版（G72③ 收编散兵）：core 只给
-        env/显式值，这里沿 显式>env>凭据仓 链补全，报错带指路。"""
-        from .net.config import resolve_credential, resolve_gateway
-        return _client.fetch_nk_payload(
-            name, resolve_gateway(url),
-            resolve_credential(key, "GENIE_API_KEY", "api_key"),
-            username=resolve_credential(user, "GENIE_USERNAME", "username"),
-            timeout=timeout)
-
-    _material._wire(remote_nk_fetch=_nk_fetch_via_store)
+    # 2026-10-27 G19b 翻转：材质库 HTTP 回退（remote_nk_fetch）退役——
+    # 材质库纯本地（genie/nkdata 随包分发），材质面不再接线。
     _preview._wire(_swap_connect)
 
 

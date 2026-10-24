@@ -79,11 +79,12 @@ as part of the fit's price.
 
 ## genie.material.load_library_nk() / list_library_materials()
 
-`load_library_nk(name, base_url=None, api_key=None, username=None, …)`
-returns `(wl, n, k)` of a library material — prefers the built-in local
-library (works offline), falls back to the server by default. Feed it to
-`fit_nk` or plot it yourself. `list_library_materials()` lists all names
-(37 entries, e.g. `Au`, `Ag`, `Si`…).
+`load_library_nk(name)` returns `(wl, n, k)` of a library material —
+**purely local** since SDK 2.0.0a9 (the library ships inside the package;
+an unknown name raises with the list of valid names — there is no HTTP
+fallback anymore). Feed it to `fit_nk` or plot it yourself.
+`list_library_materials()` lists all names (37 entries, e.g. `Au`,
+`Ag`, `Si`…).
 
 ```python
 wl, n, k = genie.material.load_library_nk('Au')

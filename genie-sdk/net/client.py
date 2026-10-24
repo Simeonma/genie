@@ -30,18 +30,6 @@ TERMINAL_OK = "succeeded"
 TERMINAL_BAD = ("failed", "killed", "archived")
 
 
-def fetch_nk_payload(name: str, base_url: str, api_key: str | None,
-                     username: str | None = None,
-                     timeout: float = 30.0) -> dict:
-    """材质库 HTTP 回退（G1 分层：core.material 经组合根钩子调用，
-    本函数是 net 侧唯一实现）。GET /api/tools/nk_library?name= →
-    {wavelength_m, n, k} payload（格式校验留在 material 侧）。"""
-    from urllib.parse import quote
-    client = Client(base_url, api_key, username=username, timeout=timeout)
-    return client._req(
-        "GET", "/api/tools/nk_library?name=" + quote(name)).json()
-
-
 def format_detail(d: Any) -> str:
     """服务端错误体 → 可读单行/多行字符串（原样信息不丢）。"""
     if isinstance(d, str):
@@ -216,15 +204,9 @@ class Client:
     #   mesh_preview 摘除——零消费者；SimConfig 直操作与网格估算不属
     #   公开 SDK 面，网格估算归本地 preview 通道）
 
-    def material_fit(self, request: dict) -> dict:
-        """nk 拟合（服务端算）：{converged, poles, quality, material_node}。"""
-        return self._req("POST", "/api/tools/material_fit",
-                         json_body=request).json()
-
-    def nk_library(self) -> dict:
-        """材料库可用 nk 名单 {models, count}——from_library 的
-        library 字段合法值（UI 下拉 / agent 择名）。"""
-        return self._req("GET", "/api/tools/nk_library").json()
+    # （2026-10-27 G19b 翻转：material_fit / nk_library 两方法随网关
+    #   tools 面撤除而摘除——材质库/拟合回归 SDK 本地 genie.core.material；
+    #   UI 下拉与拟合走 Studio 本地 /api/tools/*。）
 
     # （G3 2026-10-16 站长裁决：client.examples() 摘除——GUI 示例面板走
     #   static/examples 静态文件，SDK 用户看手册，端点无真实价值）

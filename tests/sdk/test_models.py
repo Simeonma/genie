@@ -97,7 +97,8 @@ def test_import_genie_never_imports_fdtd():
 def test_all_matches_wire_definitions():
     import types
     from genie import models
-    from genie.models import _wire
+    import genie_protocol
+    from genie_protocol import _wire  # 真源（genie.models 壳只转发，2026-10-27 拆分）
     defined_public = set()
     _TYPING_IMPORTS = {"Union", "Annotated", "Literal", "Optional"}
     for n in dir(_wire):
@@ -113,9 +114,12 @@ def test_all_matches_wire_definitions():
         if mod not in (None, _wire.__name__, "typing", "builtins"):
             continue
         defined_public.add(n)
-    assert defined_public == set(models.__all__), (
-        f"_wire 与 __all__ 漂移：仅一侧有 "
-        f"{defined_public ^ set(models.__all__)}")
+    assert defined_public == set(genie_protocol.__all__), (
+        f"真源 _wire 与 genie_protocol.__all__ 漂移：仅一侧有 "
+        f"{defined_public ^ set(genie_protocol.__all__)}")
+    assert set(models.__all__) == set(genie_protocol.__all__), (
+        "genie.models 壳与 genie_protocol 的 __all__ 漂移：仅一侧有 "
+        f"{set(models.__all__) ^ set(genie_protocol.__all__)}")
     for n in models.__all__:
         assert getattr(models, n) is not None
     for n in ("_StrictModel", "_RangeModel", "_env_int", "_check_range"):

@@ -4,14 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genie-sdk"
-version = "2.0.0a8"
+version = "2.0.0a9"
 description = "GENIE SDK v2 — 脚本构建仿真、f.run() 提交云端 GPU；preview_script 零网络预览（模型与提交互不相干）"
 requires-python = ">=3.10"
 dependencies = [
     "requests>=2.28",
     "numpy>=1.24",
-    # 线格式模型（genie.models = 唯一真源；_cfg 即 SimConfig 实例——
-    # pydantic 是 import genie 的硬运行依赖）
+    # 协议层（2026-10-27 拆分）：genie.models = genie_protocol 的兼容壳，
+    # 线格式真源住本仓 protocol/ 子目录（同一公开仓，subdirectory 安装）
+    "genie-protocol @ git+https://github.com/Simeonma/genie-sdk.git@v2.0.0a1#subdirectory=protocol",
+    # _cfg 即 SimConfig 实例——pydantic 仍是 import genie 的硬运行依赖
     "pydantic>=2,<3",
     # 结果读取（genie-results-h5/1：f.results(job_id) 的 SimData 结构体）
     "h5py>=3.0",
@@ -20,7 +22,9 @@ dependencies = [
 [project.optional-dependencies]
 # 本地 Studio 服务（genie.studio.server：静态 + /api/preview——
 # framework §四「Pyodide 删掉」后的端点，与阶段 6 云宿主同一个函数）
-server = ["fastapi>=0.104", "uvicorn>=0.24", "python-multipart>=0.0.32"]
+# 2026-10-27 G19b 翻转：/api/tools/material_fit 改本地拟合，server 面需要 scipy
+server = ["fastapi>=0.104", "uvicorn>=0.24", "python-multipart>=0.0.32",
+          "scipy>=1.10"]
 #                  ^ python-multipart：/api/workspace/upload 的 multipart 必需（B3/B4）
 # MCP 工具面（genie-mcp 命令）：让任意 LLM agent 写脚本推 GUI
 agent = ["mcp>=2.0,<3"]

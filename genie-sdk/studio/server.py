@@ -250,10 +250,45 @@ def create_app(*, preview_fn=None, static_dir: str | Path | None = None,
             _ss._CRED = {}
             return {"ok": True}
 
-        # 工具面（库清单 / 材料拟合）：拟合是服务端真算，超时放宽
-        @app.api_route("/api/tools/{path:path}", methods=["GET", "POST"])
-        async def api_tools_fwd(path: str, req: Request) -> Response:
-            return await _gw_fwd(req, f"api/tools/{path}", timeout=180.0)
+        # 工具面（库清单 / 材料拟合）——2026-10-27 起纯本地实现（G19b
+        # 翻转：材质库回归 SDK，网关 tools 面随协议层手术撤除）。路径
+        # 保持 /api/tools/* 不变（前端零改动）；拟合走本地 scipy（懒加载，
+        # 缺失时报错指路 genie[fit]），重活进线程池不堵事件环。
+        @app.get("/api/tools/nk_library")
+        async def tools_nk_library(name: str | None = None) -> dict:
+            from genie.core import material
+
+            def _lib():
+                if not name:
+                    models = material.list_library_materials()
+                    return {"models": models, "count": len(models)}
+                wl, n, k = material.load_library_nk(name)
+                return {"name": name,
+                        "wavelength_m": [float(x) for x in wl],
+                        "n": [float(x) for x in n],
+                        "k": [float(x) for x in k]}
+            return await run_in_threadpool(_lib)
+
+        @app.post("/api/tools/material_fit")
+        async def tools_material_fit(req: Request) -> dict:
+            body = await req.json()
+
+            def _fit():
+                from genie.core.material import fit_nk, load_library_nk
+                lib = body.get("library")
+                nk = body.get("nk")
+                if (lib is None) == (nk is None):
+                    raise HTTPException(422, detail="library 与 nk 恰给其一")
+                data = (load_library_nk(lib) if lib is not None else
+                        (nk.get("wavelength_m"), nk.get("n"), nk.get("k")))
+                return fit_nk(
+                    data,
+                    fit_range=tuple(body.get("fit_range") or (4e-7, 8e-7)),
+                    n_drude=int(body.get("n_drude") or 0),
+                    n_lorentz=int(body.get("n_lorentz") or 2),
+                    maxfev=int(body.get("maxfev") or 5000),
+                    name=body.get("name"))
+            return await run_in_threadpool(_fit)
 
         # 作业面（状态 / 取消 / 摘要 / 日志 / 结果元数据）
         @app.api_route("/api/jobs/{path:path}", methods=["GET", "POST"])

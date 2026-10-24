@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "genie-protocol"
+version = "2.0.0a1"
+description = "GENIE wire-format protocol layer - SimConfig models, expression evaluator, resolver, estimator (single source shared by SDK client, gateway and compute kernel)"
+requires-python = ">=3.10"
+dependencies = [
+    # _wire/resolve/sweep_expand 是 pydantic v2 模型；expr 纯标准库（懒加载不触发 pydantic）
+    "pydantic>=2,<3",
+]
+license = "Apache-2.0"
+
+# 协议层 = 独立分发身份（自己的 wheel/版本），源码住 SDK 仓 protocol/ 子目录
+# （挨着 JS 镜像保原子变更——详见 docs/ARCHITECTURE.md「协议层」节）。
+[tool.setuptools]
+packages = ["genie_protocol"]
