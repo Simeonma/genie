@@ -43,8 +43,10 @@ WHL_DIR = ROOT / "dist"
 VERSION_FILES = ("pyproject.toml", "genie-sdk/__init__.py")
 
 
-def _p(*args: object) -> None:
-    print(*args, flush=True)
+def _p(*args: object, file=None) -> None:
+    # file kwarg 透传 print（2026-10-27：历史上 _fail/_run/_git 的失败路径
+    # 都传了 file= 而本函数不收——任何报错先 TypeError，真错误信息从没打出来过）
+    print(*args, file=file, flush=True)
 
 
 def _run(cmd: list[str], *, cwd: Path = ROOT, check: bool = True) -> subprocess.CompletedProcess:
