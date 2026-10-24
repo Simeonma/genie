@@ -26,13 +26,12 @@ from __future__ import annotations
 
 import json
 import os
-import signal
-import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
 
+from ._runtime import make_runtime
 from .session_client import DEFAULT_SESSION
 
 _WORKER = Path(__file__).with_name("kernel_worker.py").resolve()
@@ -135,9 +134,8 @@ class SessionKernel:
                  session_id: str = "default") -> None:
         self._owner = owner    # 归属身份（目录名用，白名单由上层把关）
         self._session_id = session_id
-        self._proc: subprocess.Popen | None = None
+        self._rt = None
         self._lock = threading.Lock()          # 保护 lines/cfg/busy/seq
-        self._wlock = threading.Lock()         # 串行化 stdin 写（提交/绑定）
         self._lines: list[dict] = []           # [{seq, text, kind, origin, ts}]
         # 环条目结构化（2026-10-11 站长裁决「输入输出按时间序/报错一次/
         # VS Code 形态」收口）：kind ∈ input/stdout/stderr/error/note
@@ -274,24 +272,16 @@ class SessionKernel:
         return eid
 
     def stop(self) -> bool:
-        """停止当前执行（A2「长任务必须能掐」）：向 worker 发 SIGINT。
+        """停止当前执行（A2「长任务必须能掐」）：向 worker 发中断信号。
 
         worker 侧状态感知：exec 期 → StopExec 掐断 + 孤儿作业清理；
         空闲期 → 忽略（worker 永不因 SIGINT 死亡）。非忙/进程已死
-        返回 False（无事可停）；信号发不出去（OSError）同样 False。"""
+        返回 False（无事可停）；信号发不出去（OSError）同样 False。
+        平台差异（Windows 走 CTRL_BREAK_EVENT，G33）在
+        ``_runtime.PipeRuntime.stop`` 里。"""
         if not (self._alive and self.busy):
             return False
-        try:
-            if os.name == "nt":
-                # Windows 不支持 send_signal(SIGINT)（ValueError: Unsupported
-                # signal）。worker 起在独立进程组里，发 CTRL_BREAK_EVENT →
-                # 子进程 SIGBREAK → kernel_worker 里同一处理器掐断（G33）。
-                self._proc.send_signal(signal.CTRL_BREAK_EVENT)
-            else:
-                self._proc.send_signal(signal.SIGINT)
-        except (OSError, ValueError):
-            return False
-        return True
+        return self._rt.stop()
 
     def output(self, since: int) -> dict:
         """读取会话快照（**纯读**，不唤起——唤起是产品策略，见 ``ensure()``）。"""
@@ -312,8 +302,13 @@ class SessionKernel:
     # ---- 内部 ----
 
     @property
+    def _proc(self):
+        """worker 的 Popen 句柄（测试与诊断用；None = 从未起过）。"""
+        return self._rt.proc if self._rt is not None else None
+
+    @property
     def _alive(self) -> bool:
-        return self._proc is not None and self._proc.poll() is None
+        return self._rt is not None and self._rt.alive
 
     @property
     def busy(self) -> bool:
@@ -458,11 +453,8 @@ class SessionKernel:
             # 回不到 seq 续接，理由见 _restore_ring）；重生的全部语义 =
             # 杀旧进程、起新进程（f 由 worker 读 session_state.json 重放）。
             self._inflight.clear()
-        if self._proc and self._proc.poll() is None:
-            try:
-                self._proc.kill()
-            except OSError:
-                pass
+        if self._rt is not None:
+            self._rt.kill()            # 回收旧 worker（网页形态下是空操作）
         sdk_root = str(_WORKER.parent.parent.parent)   # …/sdk（dev checkout 子进程也能 import genie）
         env = {**os.environ, "PYTHONPATH": sdk_root + os.pathsep +
                os.environ.get("PYTHONPATH", ""),
@@ -476,33 +468,22 @@ class SessionKernel:
         # cwd = 本 owner 的脚本工作区（workspace 根/<owner>/，spawn 时落
         # 位 0700）——脚本内 savefig/open 的相对路径产物与 .py 同处一区
         cwd = _owner_dir(self._owner)
-        # Windows：独立进程组 → stop() 才能发 CTRL_BREAK_EVENT（G33）
-        _flags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-        self._proc = subprocess.Popen(
+        # 进程 + 管道 + 两个读线程都在 runtime 里（本机 = spawn 子进程；
+        # 网页 = 同进程调 serve()，见 _runtime 与 LEDGER G80）。
+        self._rt = make_runtime(
             [sys.executable, "-u", str(_WORKER)],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, text=True, encoding="utf-8",
-            bufsize=1, env=env,
-            cwd=str(cwd),
-            creationflags=_flags,
-        )
+            env=env, cwd=cwd,
+            on_line=self._pump, on_err=self._pump_err,
+            on_exit=self._worker_exit)
+        self._rt.start()
         self._note("会话进程已启动"
                    + ("（凭据已挂）" if self._key else "（未登录——只能编辑）"))
-        threading.Thread(target=self._pump, daemon=True).start()
-        threading.Thread(target=self._pump_err, daemon=True).start()
         if self._key:
             self._send({"op": "attach", "url": backend(), "key": self._key})
 
     def _send(self, obj: dict) -> None:
         """发一条给 worker。发不出去 = 在途 op 当场作废（否则调用方白等到超时）。"""
-        if not self._alive or self._proc.stdin is None:
-            self._ops_lost()
-            return
-        try:
-            with self._wlock:
-                self._proc.stdin.write(json.dumps(obj, ensure_ascii=False) + "\n")
-                self._proc.stdin.flush()
-        except (BrokenPipeError, OSError):
+        if self._rt is None or not self._rt.send(obj):
             self._ops_lost()
 
     def _emit(self, kind: str, text: str, origin: str, *, mark: str = "",
@@ -536,65 +517,61 @@ class SessionKernel:
     def _note(self, text: str) -> None:
         self._emit("note", f"── {text}\n", "manager")
 
-    def _pump(self) -> None:
-        """worker stdout：一行一个 JSON 事件 → 输出环 / cfg 快照 / done。"""
-        proc = self._proc
-        assert proc and proc.stdout
-        for line in proc.stdout:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                ev = json.loads(line)
-            except json.JSONDecodeError:
-                # 非 JSON 输出原样进 terminal（worker stdout 裸奔帧）
-                self._emit("stdout", line + "\n", "worker")
-                continue
-            kind = ev.get("ev")
-            if kind == "out":
-                data = ev.get("data")
-                # 生命周期 state 事件 → 现值跟踪（output 快照的数据源）
-                if isinstance(data, dict) and data.get("phase"):
-                    with self._lock:
-                        self._worker_phase = data["phase"]
-                        if data.get("job_id"):
-                            self._job_id = data["job_id"]
-                        elif data["phase"] == "idle":
-                            self._job_id = ""
-                if isinstance(data, dict) and data.get("phase") == "submit":
-                    self._begin_job_log()   # 新仿真 = 覆盖旧日志（站长裁决）
-                # kind 透传（worker 语义发射点带 note/error/job-done）；
-                # 缺省 = 纯 stdout chunk（_Out 捕获）。text 逐字透传不改
-                # 一字；data 结构化载荷随事件（G13② 事件契约）。
-                self._emit(ev.get("kind") or "stdout",
-                           ev.get("text", ""), "worker",
-                           data=data)
-            elif kind == "cfg":
+    def _pump(self, line: str) -> None:
+        """worker 的一行输出 → 输出环 / cfg 快照 / 账本（读线程在 runtime 里）。"""
+        line = line.strip()
+        if not line:
+            return
+        try:
+            ev = json.loads(line)
+        except json.JSONDecodeError:
+            # 非 JSON 输出原样进 terminal（worker stdout 裸奔帧）
+            self._emit("stdout", line + "\n", "worker")
+            return
+        kind = ev.get("ev")
+        if kind == "out":
+            data = ev.get("data")
+            # 生命周期 state 事件 → 现值跟踪（output 快照的数据源）
+            if isinstance(data, dict) and data.get("phase"):
                 with self._lock:
-                    self._cfg = {"cfg": ev.get("cfg"),
-                                 "resolved": ev.get("resolved"),
-                                 # M3 来源标记：客户端据此区分"我的写回来了"
-                                 # 与"别人改了模型"（不再靠内容猜）
-                                 "origin": ev.get("origin") or "exec",
-                                 "paths": ev.get("paths") or []}
-                    self._cfg_seq += 1
-            elif kind == "ack":
-                # 控制面回执（attach/bind）：不是 op 完成，不动账本——
-                # 换凭据不该把正在跑的 exec 标成空闲（G71 的根因）。
-                pass
-            elif kind == "done":
-                # 唯一含义 = "第 id 号 op 完成了"。done.err 仍在协议里（API/agent
-                # 消费用）；terminal 显示由 worker 的 out 流唯一负责——traceback/
-                # ⏱/回滚提示已在环里，不再二次打印（2026-10-11 站长裁决）。
-                self._op_end(ev.get("id"))
-        # stdout EOF = worker 退出（B2：不再有「会话态已丢」——输出历史
-        # 在环落盘里，会话 f 由 worker 重生时读 session_state.json 重放）
+                    self._worker_phase = data["phase"]
+                    if data.get("job_id"):
+                        self._job_id = data["job_id"]
+                    elif data["phase"] == "idle":
+                        self._job_id = ""
+            if isinstance(data, dict) and data.get("phase") == "submit":
+                self._begin_job_log()   # 新仿真 = 覆盖旧日志（站长裁决）
+            # kind 透传（worker 语义发射点带 note/error/job-done）；
+            # 缺省 = 纯 stdout chunk（_Out 捕获）。text 逐字透传不改
+            # 一字；data 结构化载荷随事件（G13② 事件契约）。
+            self._emit(ev.get("kind") or "stdout",
+                       ev.get("text", ""), "worker",
+                       data=data)
+        elif kind == "cfg":
+            with self._lock:
+                self._cfg = {"cfg": ev.get("cfg"),
+                             "resolved": ev.get("resolved"),
+                             # M3 来源标记：客户端据此区分"我的写回来了"
+                             # 与"别人改了模型"（不再靠内容猜）
+                             "origin": ev.get("origin") or "exec",
+                             "paths": ev.get("paths") or []}
+                self._cfg_seq += 1
+        elif kind == "ack":
+            # 控制面回执（attach/bind）：不是 op 完成，不动账本——
+            # 换凭据不该把正在跑的 exec 标成空闲（G71 的根因）。
+            pass
+        elif kind == "done":
+            # 唯一含义 = "第 id 号 op 完成了"。done.err 仍在协议里（API/agent
+            # 消费用）；terminal 显示由 worker 的 out 流唯一负责——traceback/
+            # ⏱/回滚提示已在环里，不再二次打印（2026-10-11 站长裁决）。
+            self._op_end(ev.get("id"))
+
+    def _worker_exit(self) -> None:
+        """stdout EOF = worker 退出（B2：不再有「会话态已丢」——输出历史
+        在环落盘里，会话 f 由 worker 重生时读 session_state.json 重放）"""
         self._note("会话进程退出——下次执行自动重生（输出历史保留，会话 f 由落盘恢复）")
         self._ops_lost()
 
-    def _pump_err(self) -> None:
-        proc = self._proc
-        assert proc and proc.stderr
-        for line in proc.stderr:
-            if line.strip():
-                self._emit("stderr", "[err] " + line, "manager")
+    def _pump_err(self, line: str) -> None:
+        if line.strip():
+            self._emit("stderr", "[err] " + line, "manager")

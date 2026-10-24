@@ -80,8 +80,11 @@ class _Out:
         pass
 
 
-def main() -> None:
+def main(readline=None, emit_fn=None, expose=None) -> None:
     global _exec_busy, _stop_requested
+    # 运行时缝（LEDGER G80）：readline / emit_fn 可注入——本机缺省 =
+    # stdin/stdout 管道（子进程形态），网页 = 同进程队列。
+    readline = readline or sys.stdin.readline
     real_out = sys.stdout            # IPC 通道本体（exec 期间被重定向走）
     # IPC 通道一律 UTF-8：Windows 控制台/管道缺省 ANSI 代码页（GBK），
     # emit 里的 emoji（🧹/⏱/✓）会 UnicodeEncodeError 炸 worker。
@@ -90,6 +93,9 @@ def main() -> None:
     import genie                     # 真 SDK（宿主 venv editable 安装）
 
     def emit(obj):
+        if emit_fn is not None:      # 同进程形态：直接回调，不碰 stdout
+            emit_fn(obj)
+            return
         real_out.write(json.dumps(obj, ensure_ascii=False, default=repr) + "\n")
         real_out.flush()
 
@@ -694,14 +700,14 @@ def main() -> None:
     # 否则只在 fetch 后清意味着「重生后永不下载则配额永不生效」。
     _prune_results()
 
-    while True:
-        line = sys.stdin.readline()
-        if not line:
-            break
+    def _step(line):
+        # 循环体（本机由下面的 while 驱动；网页同进程形态由 _runtime.InprocRuntime
+        # 逐条调用——同一份代码，两个驱动方。见 LEDGER G80 第 4b 步）。
+        nonlocal ns, sims, sim, sess_url
         try:
             msg = json.loads(line)
         except json.JSONDecodeError:
-            continue
+            return
         op = msg.get("op")
         if op in ("attach", "bind"):      # bind = 旧名（前端/旧宿主兼容）
             try:
@@ -800,7 +806,7 @@ def main() -> None:
                                          timeout_s=msg.get("timeout_s")),
                     msg.get("timeout_s"))
                 emit({"ev": "done", "id": eid, "ok": ok, "err": err})
-                continue
+                return
 
             code = msg.get("code") or ""
             # 兼容一版：旧前端发 reset:true（脚本 Run 的旧名）→ build。
@@ -852,6 +858,17 @@ def main() -> None:
             persist_state()     # 模型变了才落盘（build 失败时提交前状态不变，
                                 # 但 persist 是幂等快照，照写无妨）
             emit({"ev": "done", "id": eid, "ok": ok, "err": err})
+
+    if expose is not None:
+        # 同进程形态（网页 Pyodide）：不跑循环，把 _step 交出去，
+        # 由调用方逐条驱动——执行逻辑与子进程形态是同一个 _step。
+        expose(_step)
+        return
+    while True:
+        line = readline()
+        if not line:
+            break
+        _step(line)
 
 
 def contextlib_redirect(out):

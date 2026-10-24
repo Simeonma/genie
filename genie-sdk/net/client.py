@@ -21,9 +21,8 @@ import os
 import time as _time
 from typing import Any, Callable
 
-import requests
-
 from ..models.errors import GenieHTTPError, GenieJobError
+from ._transport import TransportError, make_transport
 
 TERMINAL_OK = "succeeded"
 # "archived" = 作业已被 janitor 归档（终态，产物在 archive_path 下）。不把它
@@ -65,7 +64,7 @@ def format_detail(d: Any) -> str:
 
 
 class Client:
-    """极薄 requests 会话封装。所有方法可被测试替身覆盖（SDK 测试与
+    """极薄 HTTP 会话封装（传输实现可换：本机 requests / 网页 fetch）。所有方法可被测试替身覆盖（SDK 测试与
     前端代码生成器的 round-trip 测试都靠这一点注入假传输层）。"""
 
     def __init__(self, base_url: str, api_key: str | None = None,
@@ -80,7 +79,7 @@ class Client:
         # 结果下载独立超时（audit 批 α）：fetch_npz 拉大 npz 不该被
         # 30s 常规请求超时掐断——None=不限，显式数值可覆写。
         self._timeout_download = timeout_download
-        self._s = requests.Session()
+        self._s = make_transport()
         # audit 批 β 账 3：key 缺省（None/空）时**不发** X-API-Key 头。
         # 服务端 require_api_key 对「缺头」与「空头」等价（均 401
         # "缺少 X-API-Key 请求头"，fdtd.serve.auth `if not x_api_key`），
@@ -98,7 +97,7 @@ class Client:
 
     def _req(self, method: str, path: str, *, ok: tuple[int, ...] = (200,),
              json_body: Any = None,
-             timeout: float | None = None) -> requests.Response:
+             timeout: float | None = None) -> Any:
         eff = self.timeout if timeout is None else timeout
         # 会话轨的代理按 X-Upstream-Timeout 控制上游超时（直连时网关
         # 忽略未知头，无害）——否则 /gw 的 120s 缺省会盖掉本地设置。
@@ -107,7 +106,7 @@ class Client:
             r = self._s.request(method, self.base_url + path,
                                 json=json_body,
                                 timeout=eff)
-        except requests.RequestException as e:
+        except TransportError as e:
             # S3（audit 批 α）：不加自动重试（YAGNI），只提示可重入——
             # 网络瞬断对该 API 是安全操作（幂等读 / 提交前重试）。
             raise GenieHTTPError(
